@@ -98,28 +98,18 @@ export default function StopForm({ initial, isNew }: Props) {
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Order">
+        <Field label="Indoor?">
+          <label className="flex items-center gap-2 px-2 py-1.5 border border-stone-300 rounded text-sm">
             <input
-              type="number"
-              value={stop.order}
-              onChange={(e) => patch({ order: parseInt(e.target.value, 10) || 0 })}
-              className="w-full px-2 py-1.5 border border-stone-300 rounded text-sm"
+              type="checkbox"
+              checked={stop.isIndoor}
+              onChange={(e) => patch({ isIndoor: e.target.checked })}
             />
-          </Field>
-          <Field label="Indoor?">
-            <label className="flex items-center gap-2 px-2 py-1.5 border border-stone-300 rounded text-sm">
-              <input
-                type="checkbox"
-                checked={stop.isIndoor}
-                onChange={(e) => patch({ isIndoor: e.target.checked })}
-              />
-              <span className="text-stone-700">
-                Inside a building (revealed via "Are you inside?" prompt, not GPS)
-              </span>
-            </label>
-          </Field>
-        </div>
+            <span className="text-stone-700">
+              Inside a building (revealed via "Are you inside?" prompt, not GPS)
+            </span>
+          </label>
+        </Field>
       </Section>
 
       {/* ── Location ─────────────────────────────────────────────── */}

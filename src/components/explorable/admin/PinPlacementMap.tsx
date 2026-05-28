@@ -13,6 +13,7 @@ import {
   APIProvider,
   Map as GoogleMap,
   AdvancedMarker,
+  AdvancedMarkerAnchorPoint,
   MapMouseEvent,
 } from '@vis.gl/react-google-maps';
 import { LatLng } from '@/lib/explorable/geo';
@@ -70,7 +71,10 @@ export default function PinPlacementMap({ value, onChange, heightPx = 360 }: Pro
           style={{ width: '100%', height: '100%' }}
         >
           {value && (
-            <AdvancedMarker position={value}>
+            <AdvancedMarker
+              position={value}
+              anchorPoint={AdvancedMarkerAnchorPoint.CENTER}
+            >
               <PlacementPin />
             </AdvancedMarker>
           )}
@@ -90,7 +94,6 @@ function PlacementPin() {
         background: '#e53935',
         border: '3px solid #fff',
         boxShadow: '0 0 8px rgba(0,0,0,0.5)',
-        transform: 'translate(-50%, -50%)',
       }}
       aria-label="Stop location"
     />

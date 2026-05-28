@@ -28,7 +28,6 @@ export interface ExplorableStopAudio {
 
 export interface ExplorableStop {
   id: string;
-  order: number;
   title: string;
 
   /** Real-world location of this stop. Set via click-to-place in the admin. */
@@ -84,12 +83,11 @@ export function newStopId(): string {
   return `stop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Defaults for a brand-new stop. Caller fills in order. */
-export function blankStop(order: number): ExplorableStop {
+/** Defaults for a brand-new stop. Stops are unstructured — no explicit order. */
+export function blankStop(): ExplorableStop {
   const now = new Date().toISOString();
   return {
     id: newStopId(),
-    order,
     title: '',
     // Default location: Memorial Church (matches the explorable's center).
     location: { lat: 37.4275, lng: -122.1697 },

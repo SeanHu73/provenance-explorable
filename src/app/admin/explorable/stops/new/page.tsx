@@ -3,24 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { blankStop, ExplorableStop } from '@/lib/explorable/stop-types';
-import { getStops } from '@/lib/explorable/stops-store';
 import StopForm from '@/components/explorable/admin/StopForm';
 
 export default function NewStopPage() {
   const [initial, setInitial] = useState<ExplorableStop | null>(null);
 
-  // Pick a sensible default order = max(existing orders) + 1.
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const stops = await getStops();
-      if (!alive) return;
-      const nextOrder = stops.length > 0
-        ? Math.max(...stops.map((s) => s.order)) + 1
-        : 1;
-      setInitial(blankStop(nextOrder));
-    })();
-    return () => { alive = false; };
+    setInitial(blankStop());
   }, []);
 
   return (

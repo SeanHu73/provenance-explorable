@@ -27,7 +27,8 @@ export async function getStops(): Promise<ExplorableStop[]> {
     const snap = await getDocs(collection(db, COLLECTION));
     const stops: ExplorableStop[] = [];
     snap.forEach((d) => stops.push({ id: d.id, ...d.data() } as ExplorableStop));
-    return stops.sort((a, b) => a.order - b.order);
+    // Unstructured — show by creation order so the list is at least stable.
+    return stops.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   } catch (err) {
     console.error('[explorable/stops-store] getStops failed:', err);
     return [];

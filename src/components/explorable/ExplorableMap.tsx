@@ -18,6 +18,7 @@ import {
   APIProvider,
   Map as GoogleMap,
   AdvancedMarker,
+  AdvancedMarkerAnchorPoint,
   MapMouseEvent,
 } from '@vis.gl/react-google-maps';
 import {
@@ -83,6 +84,7 @@ export default function ExplorableMap() {
           {loc.position && (
             <AdvancedMarker
               position={{ lat: loc.position.lat, lng: loc.position.lng }}
+              anchorPoint={AdvancedMarkerAnchorPoint.CENTER}
             >
               <PlayerDot source={loc.position.source} />
             </AdvancedMarker>
@@ -110,7 +112,6 @@ function PlayerDot({ source }: { source: 'gps' | 'dev' }) {
         position: 'relative',
         width: 28,
         height: 28,
-        transform: 'translate(-50%, -50%)',
       }}
       aria-label={source === 'dev' ? 'Fake player position' : 'Your position'}
     >

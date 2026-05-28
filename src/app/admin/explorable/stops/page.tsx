@@ -74,9 +74,6 @@ export default function StopsListPage() {
                   className="block p-3 bg-white border border-stone-300 rounded hover:bg-stone-50"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="text-xs text-stone-400 font-mono w-8 flex-shrink-0">
-                      {String(s.order).padStart(2, '0')}
-                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium">
                         {s.title || <em className="text-stone-400">(untitled)</em>}
