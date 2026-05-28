@@ -5,17 +5,17 @@
  * timer / photos / audio), context (text / photos / audio), puzzle piece
  * (photo / label), author assessment (included / explanation).
  *
- * The form keeps a local copy of the stop and only writes to Firestore
- * when the user clicks Save. Photo + audio uploads land immediately
- * (they need to be persisted to Storage to get a URL) but are only
- * referenced from the in-memory stop until Save.
+ * Changes auto-save to Firestore after 1s of stability. The first save
+ * of a brand-new stop also redirects the URL from /stops/new to
+ * /stops/[id] so a refresh restores the in-progress draft.
  */
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExplorableStop, resolvePuzzlePiece } from '@/lib/explorable/stop-types';
 import { saveStop, deleteStop } from '@/lib/explorable/stops-store';
+import { useAutoSave, autoSaveLabel, autoSaveColor } from '@/lib/explorable/use-auto-save';
 import PhotoUploader from './PhotoUploader';
 import AudioUploader from './AudioUploader';
 
@@ -29,8 +29,8 @@ interface Props {
 export default function StopForm({ initial, isNew }: Props) {
   const router = useRouter();
   const [stop, setStop] = useState<ExplorableStop>(initial);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [hasFirstSaved, setHasFirstSaved] = useState(!isNew);
 
   // Convenience setters so the JSX stays readable.
   const patch = (p: Partial<ExplorableStop>) => setStop((s) => ({ ...s, ...p }));
@@ -43,47 +43,57 @@ export default function StopForm({ initial, isNew }: Props) {
   const patchAssessment = (p: Partial<ExplorableStop['authorAssessment']>) =>
     setStop((s) => ({ ...s, authorAssessment: { ...s.authorAssessment, ...p } }));
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!stop.title.trim()) {
-      setError('Title is required.');
-      return;
-    }
-    setSaving(true);
-    try {
-      await saveStop(stop);
-      router.push('/admin/explorable/stops');
-    } catch (err) {
-      console.error('[StopForm] save failed', err);
-      setError('Save failed. Check Firestore rules and the console.');
-    } finally {
-      setSaving(false);
-    }
-  }
+  const save = useCallback((s: ExplorableStop) => saveStop(s), []);
+
+  const onSaved = useCallback(
+    (saved: ExplorableStop) => {
+      // First successful save of a brand-new stop: switch URL from
+      // /stops/new to /stops/[id] so a refresh restores the draft.
+      if (isNew && !hasFirstSaved) {
+        setHasFirstSaved(true);
+        router.replace(`/admin/explorable/stops/${saved.id}`);
+      }
+    },
+    [isNew, hasFirstSaved, router],
+  );
+
+  const { status, lastError } = useAutoSave({
+    value: stop,
+    save,
+    onSaved,
+    delayMs: 1000,
+  });
 
   async function handleDelete() {
     if (!confirm('Delete this stop? This cannot be undone.')) return;
-    setSaving(true);
+    setDeleting(true);
     try {
       await deleteStop(stop.id);
       router.push('/admin/explorable/stops');
     } catch (err) {
       console.error('[StopForm] delete failed', err);
-      setError('Delete failed.');
-      setSaving(false);
+      alert('Delete failed. Check Firestore rules.');
+      setDeleting(false);
     }
   }
 
   const resolvedPiece = resolvePuzzlePiece(stop);
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
-      {error && (
-        <div className="p-3 rounded border border-red-300 bg-red-50 text-red-900 text-sm">
-          {error}
-        </div>
-      )}
+    <form className="space-y-6 max-w-3xl" onSubmit={(e) => e.preventDefault()}>
+      {/* ── Auto-save status banner ──────────────────────────────── */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-stone-50/95 backdrop-blur border-b border-stone-200 flex items-center justify-between">
+        <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
+          {autoSaveLabel(status) || (
+            <span className="text-stone-400">All changes saved</span>
+          )}
+        </span>
+        {lastError && (
+          <span className="text-xs text-red-700" title={lastError}>
+            ⚠ {lastError.slice(0, 60)}
+          </span>
+        )}
+      </div>
 
       {/* ── Header ───────────────────────────────────────────────── */}
       <Section title="Header">
@@ -279,29 +289,20 @@ export default function StopForm({ initial, isNew }: Props) {
             <button
               type="button"
               onClick={handleDelete}
-              disabled={saving}
+              disabled={deleting}
               className="px-3 py-1.5 rounded bg-red-700 text-white text-sm hover:bg-red-800 disabled:opacity-50"
             >
-              Delete stop
+              {deleting ? 'Deleting…' : 'Delete stop'}
             </button>
           )}
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => router.push('/admin/explorable/stops')}
-            className="px-3 py-1.5 rounded border border-stone-300 text-sm hover:bg-stone-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-1.5 rounded bg-blue-700 text-white text-sm hover:bg-blue-800 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : isNew ? 'Create stop' : 'Save changes'}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/admin/explorable/stops')}
+          className="px-3 py-1.5 rounded border border-stone-300 text-sm hover:bg-stone-100"
+        >
+          Back to stops
+        </button>
       </div>
     </form>
   );

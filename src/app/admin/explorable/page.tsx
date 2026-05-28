@@ -5,7 +5,7 @@
  * + navigation to per-stop authoring.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { STANFORD_BOUNDS, STANFORD_CENTER } from '@/lib/explorable/geo';
 import {
@@ -14,6 +14,11 @@ import {
   getConfig,
   saveConfig,
 } from '@/lib/explorable/config-store';
+import {
+  useAutoSave,
+  autoSaveLabel,
+  autoSaveColor,
+} from '@/lib/explorable/use-auto-save';
 
 export default function ExplorableAdminPage() {
   return (
@@ -113,9 +118,6 @@ export default function ExplorableAdminPage() {
 function EssentialQuestionEditor() {
   const [config, setConfig] = useState<ExplorableConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -128,26 +130,26 @@ function EssentialQuestionEditor() {
     return () => { alive = false; };
   }, []);
 
-  async function handleSave() {
-    setSaving(true);
-    setStatus(null);
-    try {
-      const next = await saveConfig(config);
-      setConfig(next);
-      setDirty(false);
-      setStatus('Saved.');
-      setTimeout(() => setStatus(null), 3000);
-    } catch (err) {
-      console.error('[EQ editor] save failed', err);
-      setStatus('Save failed. Check Firestore rules.');
-    } finally {
-      setSaving(false);
-    }
-  }
+  const save = useCallback((c: ExplorableConfig) => saveConfig(c), []);
+
+  // Don't auto-save until the initial load is done — otherwise we'd
+  // overwrite the stored value with DEFAULT_CONFIG before it loads.
+  const { status, lastError } = useAutoSave({
+    value: loading ? DEFAULT_CONFIG : config,
+    save,
+    delayMs: 1000,
+  });
 
   return (
     <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
-      <h2 className="font-semibold text-lg mb-1">Essential Question</h2>
+      <div className="flex items-baseline justify-between mb-1 gap-3">
+        <h2 className="font-semibold text-lg">Essential Question</h2>
+        <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
+          {autoSaveLabel(status) || (
+            <span className="text-stone-400">All changes saved</span>
+          )}
+        </span>
+      </div>
       <p className="text-xs text-stone-600 mb-3">
         Shown to players when they first enter the game and restated at the
         midway and final sorts. Players don't answer it directly — their
@@ -160,30 +162,16 @@ function EssentialQuestionEditor() {
         <>
           <textarea
             value={config.essentialQuestion}
-            onChange={(e) => {
-              setConfig({ ...config, essentialQuestion: e.target.value });
-              setDirty(true);
-            }}
+            onChange={(e) =>
+              setConfig({ ...config, essentialQuestion: e.target.value })
+            }
             rows={3}
             placeholder={'e.g. "What is this place for?"'}
             className="w-full px-3 py-2 border border-stone-300 rounded text-base"
           />
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              className="px-3 py-1.5 rounded bg-blue-700 text-white text-sm hover:bg-blue-800 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save question'}
-            </button>
-            {status && (
-              <span className="text-xs text-stone-600">{status}</span>
-            )}
-            {dirty && !status && (
-              <span className="text-xs text-amber-700">Unsaved changes</span>
-            )}
-          </div>
+          {lastError && (
+            <p className="mt-2 text-xs text-red-700">{lastError}</p>
+          )}
         </>
       )}
     </section>
