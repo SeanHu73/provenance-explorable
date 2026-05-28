@@ -18,6 +18,7 @@ import { saveStop, deleteStop } from '@/lib/explorable/stops-store';
 import { useAutoSave, autoSaveLabel, autoSaveColor } from '@/lib/explorable/use-auto-save';
 import PhotoUploader from './PhotoUploader';
 import AudioUploader from './AudioUploader';
+import IndoorMapEditor from './IndoorMapEditor';
 
 const PinPlacementMap = dynamic(() => import('./PinPlacementMap'), { ssr: false });
 
@@ -121,6 +122,16 @@ export default function StopForm({ initial, isNew }: Props) {
           </label>
         </Field>
       </Section>
+
+      {/* ── Indoor map (only when isIndoor) ──────────────────────── */}
+      {stop.isIndoor && (
+        <Section title="Indoor map">
+          <IndoorMapEditor
+            value={stop.indoorMap}
+            onChange={(indoorMap) => patch({ indoorMap })}
+          />
+        </Section>
+      )}
 
       {/* ── Location ─────────────────────────────────────────────── */}
       <Section title="Location">

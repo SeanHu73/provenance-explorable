@@ -171,26 +171,30 @@ function EssentialQuestionEditor() {
     delayMs: 1000,
   });
 
-  return (
-    <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
-      <div className="flex items-baseline justify-between mb-1 gap-3">
-        <h2 className="font-semibold text-lg">Essential Question</h2>
-        <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
-          {autoSaveLabel(status) || (
-            <span className="text-stone-400">All changes saved</span>
-          )}
-        </span>
-      </div>
-      <p className="text-xs text-stone-600 mb-3">
-        Shown to players when they first enter the game and restated at the
-        midway and final sorts. Players don't answer it directly — their
-        evidence selections constitute their implicit answer.
-      </p>
+  const saveIndicator = (
+    <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
+      {autoSaveLabel(status) || (
+        <span className="text-stone-400">All changes saved</span>
+      )}
+    </span>
+  );
 
-      {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
-      ) : (
-        <>
+  return (
+    <>
+      <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
+        <div className="flex items-baseline justify-between mb-1 gap-3">
+          <h2 className="font-semibold text-lg">Essential Question</h2>
+          {saveIndicator}
+        </div>
+        <p className="text-xs text-stone-600 mb-3">
+          Shown to players when they first enter the game and restated at
+          the midway and final sorts. Players don't answer it directly —
+          their evidence selections constitute their implicit answer.
+        </p>
+
+        {loading ? (
+          <p className="text-sm text-stone-500">Loading…</p>
+        ) : (
           <textarea
             value={config.essentialQuestion}
             onChange={(e) =>
@@ -200,24 +204,36 @@ function EssentialQuestionEditor() {
             placeholder={'e.g. "What is this place for?"'}
             className="w-full px-3 py-2 border border-stone-300 rounded text-base"
           />
+        )}
 
-          <div className="mt-6 pt-4 border-t border-stone-200">
-            <SinglePhotoField
-              label="Background photo"
-              description="Shown behind every player-facing screen (lesson + stop cards). Individual stops can override this with their own photo."
-              value={config.backgroundPhotoUrl}
-              onChange={(url) =>
-                setConfig({ ...config, backgroundPhotoUrl: url })
-              }
-              previewClassName="w-full max-w-md aspect-[4/3]"
-            />
-          </div>
+        {lastError && (
+          <p className="mt-2 text-xs text-red-700">{lastError}</p>
+        )}
+      </section>
 
-          {lastError && (
-            <p className="mt-2 text-xs text-red-700">{lastError}</p>
-          )}
-        </>
-      )}
-    </section>
+      <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
+        <div className="flex items-baseline justify-between mb-1 gap-3">
+          <h2 className="font-semibold text-lg">Background Photo</h2>
+          {saveIndicator}
+        </div>
+        <p className="text-xs text-stone-600 mb-3">
+          Shown behind every player-facing screen (lesson + stop cards).
+          A single image applies across the whole game.
+        </p>
+
+        {loading ? (
+          <p className="text-sm text-stone-500">Loading…</p>
+        ) : (
+          <SinglePhotoField
+            label="Image"
+            value={config.backgroundPhotoUrl}
+            onChange={(url) =>
+              setConfig({ ...config, backgroundPhotoUrl: url })
+            }
+            previewClassName="w-full max-w-md aspect-[4/3]"
+          />
+        )}
+      </section>
+    </>
   );
 }

@@ -26,6 +26,20 @@ export interface ExplorableStopAudio {
   title?: string;
 }
 
+/**
+ * Indoor location aid — a custom image (floor plan, room photo, etc.)
+ * with a pin showing where to find this stop. Used in place of GPS for
+ * indoor stops since GPS is too unreliable inside buildings.
+ *
+ * pinX / pinY are PERCENTAGES (0-100) of the image's width / height, so
+ * the pin scales correctly at any rendered size.
+ */
+export interface IndoorMap {
+  photoUrl: string;
+  pinX: number;
+  pinY: number;
+}
+
 export interface ExplorableStop {
   id: string;
   title: string;
@@ -41,6 +55,13 @@ export interface ExplorableStop {
    * Yes, all indoor stops for that building are revealed at once.
    */
   isIndoor: boolean;
+
+  /**
+   * Optional indoor "where to look" map shown to players when they
+   * enter the stop. Authored by tapping a point on an uploaded image.
+   * Ignored when isIndoor is false.
+   */
+  indoorMap: IndoorMap | null;
 
   // Phase 1: Notice card — observation prompt + photos + optional audio.
   notice: {
@@ -92,6 +113,7 @@ export function blankStop(): ExplorableStop {
     // Default location: Memorial Church (matches the explorable's center).
     location: { lat: 37.4275, lng: -122.1697 },
     isIndoor: false,
+    indoorMap: null,
     notice: {
       prompt: '',
       timerSeconds: null,
