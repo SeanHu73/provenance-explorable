@@ -1,26 +1,25 @@
 'use client';
 
 /**
- * The midway "What is contextualisation?" lesson.
+ * Plays the Contextualisation lesson — either authored screens (from
+ * config.explainerScreens) or, if none authored yet, a built-in
+ * fallback (the cake whodunnit + puzzle animation).
  *
- * Visual treatment mirrors Provenance: the game-level background photo
- * sits fixed behind every screen; each section's content lives in a
- * translucent, backdrop-blurred card. Falls back to a warm neutral if
- * no background photo is set.
+ * Always ends on a screen that restates the Essential Question.
  *
- * Two interactive beats:
- *   - the cake whodunnit (multiple choice A/B/C — wrong choices show
- *     a red explanation, correct choice turns green and auto-scrolls)
- *   - the puzzle animation (two pieces from different puzzles refuse
- *     to fit; then a matching piece slides in cleanly)
- *
- * The final section restates whatever EQ is currently saved in
- * explorable-config so the lesson lands inside the actual game.
+ * Visual treatment: fixed background photo + translucent backdrop-
+ * blurred cards. Snap-scroll with snap-stop:always so a single fling
+ * can't skip multiple screens.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { getConfig } from '@/lib/explorable/config-store';
+import {
+  Screen,
+  TextScreen,
+  QuestionScreen,
+} from '@/lib/explorable/explainer-types';
 
 interface Props {
   onClose: () => void;
@@ -30,16 +29,18 @@ export default function ContextualisationExplainer({ onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [eq, setEq] = useState<string>('');
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
+  const [authored, setAuthored] = useState<Screen[] | null>(null);
 
   useEffect(() => {
     getConfig().then((c) => {
       setEq(c.essentialQuestion || 'What is this place for?');
       setBgPhoto(c.backgroundPhotoUrl);
+      setAuthored(c.explainerScreens || []);
     });
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }, []);
 
-  const scrollTo = (id: string) => {
+  const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -49,23 +50,19 @@ export default function ContextualisationExplainer({ onClose }: Props) {
       className="fixed inset-0 z-50"
       style={{
         fontFamily: 'var(--font-newsreader), Georgia, serif',
-        backgroundColor: '#e9e4e2', // theme bg color, shown if no photo
+        backgroundColor: '#e9e4e2',
       }}
     >
-      {/* Fixed background photo */}
       {bgPhoto && (
         <div className="absolute inset-0 z-0">
           <img
             src={bgPhoto}
             alt=""
             className="w-full h-full object-cover"
-            style={{ filter: 'contrast(100%)' }}
           />
         </div>
       )}
 
-      {/* Close button — high contrast so it reads on either light or
-          photo background */}
       <button
         onClick={onClose}
         className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-stone-900 text-2xl leading-none flex items-center justify-center shadow-lg backdrop-blur-sm"
@@ -78,136 +75,306 @@ export default function ContextualisationExplainer({ onClose }: Props) {
         ref={containerRef}
         className="relative z-10 h-[100dvh] w-full overflow-y-auto snap-y snap-mandatory"
       >
-        <Section id="s-eq">
-          <Heading>What is historical contextualisation?</Heading>
-          <ScrollHint />
-        </Section>
+        {authored === null ? (
+          <SnapShell>
+            <Body className="italic text-stone-500">Loading…</Body>
+          </SnapShell>
+        ) : authored.length > 0 ? (
+          authored.map((s, i) => (
+            <AuthoredScreenView
+              key={s.id}
+              screen={s}
+              isLast={i === authored.length - 1}
+              onCorrectAdvance={() => scrollToId('s-eq')}
+            />
+          ))
+        ) : (
+          <FallbackContent
+            onAdvanceToPuzzle={() => scrollToId('s-puzzle-intro')}
+          />
+        )}
 
-        <Section id="s-def">
-          <Body>
-            Contextualisation is the process of understanding people, ideas,
-            and events in the past within their specific time and place.
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-church">
-          <Body>
-            We wouldn't look at the church and say that the Stanfords wanted
-            to build this university because it was located in Silicon Valley.
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-discuss">
-          <Heading>Why not? Discuss.</Heading>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-because">
-          <Body>
-            Because the university was built long before Silicon Valley was
-            a thing!
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-transition">
-          <Body className="italic text-stone-700">
-            Let's find an example you might relate to…
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-cake-setup">
-          <Body>
-            You left a cake in the fridge at school on Friday. When you went
-            back to the fridge on Monday, it was gone. Who took it?
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-clue-a">
-          <Clue tag="Clue A">
-            Your friend <strong>Jason</strong> was eating a cake last Thursday.
-            It must have been him.
-          </Clue>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-clue-b">
-          <Clue tag="Clue B">
-            Early in the morning, your roommate <strong>Margot</strong> was
-            eating a cake. Got her!
-          </Clue>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-clue-c">
-          <Clue tag="Clue C">
-            On your way out of school, you saw a <strong>cleaner</strong>{' '}
-            walking into the fridge with a big bag full of trash. Maybe?
-          </Clue>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-question" wide>
-          <CakeQuestion onCorrect={() => scrollTo('s-puzzle-intro')} />
-        </Section>
-
-        <Section id="s-puzzle-intro">
-          <Body>
-            Historical contextualisation is a lot like putting together a
-            puzzle. You can't use a piece from a different puzzle and expect
-            it to fit. You also can't just use any random piece from the
-            same puzzle unless it's the one right next to it.
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-puzzle-anim" wide>
-          <PuzzleAnimation />
-        </Section>
-
-        <Section id="s-history-puzzle">
-          <Body>
-            In history, we are trying to find pieces of the puzzle across
-            time and space. Let's go back to answering our question.
-          </Body>
-          <ScrollHint />
-        </Section>
-
-        <Section id="s-eq-restated">
+        {/* Final EQ screen — always appended */}
+        <SnapShell id="s-eq">
           <div className="text-xs uppercase tracking-[0.3em] text-stone-500 mb-4">
             Our essential question
           </div>
           <Heading>{eq || 'What is this place for?'}</Heading>
-        </Section>
+        </SnapShell>
       </div>
     </div>
   );
 }
 
-// ───── Layout helpers ─────────────────────────────────────────
+// ───── Authored screen renderers ────────────────────────────
 
-function Section({
-  children,
+function AuthoredScreenView({
+  screen,
+  isLast,
+  onCorrectAdvance,
+}: {
+  screen: Screen;
+  isLast: boolean;
+  onCorrectAdvance: () => void;
+}) {
+  if (screen.kind === 'text') return <TextScreenView screen={screen} />;
+  return (
+    <QuestionScreenView
+      screen={screen}
+      onCorrect={isLast ? onCorrectAdvance : () => {/* default snap */}}
+    />
+  );
+}
+
+function TextScreenView({ screen }: { screen: TextScreen }) {
+  return (
+    <SnapShell>
+      {screen.tag && <Tag>{screen.tag}</Tag>}
+      {screen.contentHtml && (
+        <div
+          className="rich text-xl sm:text-2xl leading-relaxed"
+          style={{ color: 'var(--th-text, #3a3a32)' }}
+          dangerouslySetInnerHTML={{ __html: screen.contentHtml }}
+        />
+      )}
+      {screen.imageUrl && (
+        <img
+          src={screen.imageUrl}
+          alt=""
+          className="mt-2 w-full rounded-lg shadow"
+        />
+      )}
+      <ScrollHint />
+    </SnapShell>
+  );
+}
+
+function QuestionScreenView({
+  screen,
+  onCorrect,
+}: {
+  screen: QuestionScreen;
+  onCorrect: () => void;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const handledCorrectRef = useRef(false);
+
+  const handleClick = (id: string) => {
+    setSelected(id);
+    const opt = screen.options.find((o) => o.id === id);
+    if (opt?.correct && !handledCorrectRef.current) {
+      handledCorrectRef.current = true;
+      setTimeout(onCorrect, 1600);
+    }
+  };
+
+  const selectedOpt = selected
+    ? screen.options.find((o) => o.id === selected) || null
+    : null;
+
+  return (
+    <SnapShell wide>
+      <div className="space-y-8">
+        {screen.questionHtml ? (
+          <div
+            className="rich"
+            style={{
+              fontFamily: 'var(--font-dm-serif-display), Georgia, serif',
+              color: 'var(--th-primary, #8b2538)',
+              fontSize: '2rem',
+              lineHeight: 1.15,
+            }}
+            dangerouslySetInnerHTML={{ __html: screen.questionHtml }}
+          />
+        ) : (
+          <Heading>Question</Heading>
+        )}
+
+        <div className="flex flex-col gap-3 max-w-md mx-auto">
+          {screen.options.map((opt) => {
+            const isSelected = selected === opt.id;
+            const isCorrect = isSelected && opt.correct;
+            const isWrong = isSelected && !opt.correct;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleClick(opt.id)}
+                className={`px-5 py-4 rounded-lg text-lg sm:text-xl text-left transition-colors border-2 font-medium ${
+                  isCorrect
+                    ? 'bg-green-600 border-green-700 text-white'
+                    : isWrong
+                    ? 'bg-red-600 border-red-700 text-white'
+                    : 'bg-white/70 border-stone-300 text-stone-800 hover:bg-white hover:border-stone-500'
+                }`}
+                style={{
+                  fontFamily: 'var(--font-newsreader), Georgia, serif',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <AnimatePresence mode="wait">
+          {selectedOpt && (
+            <motion.div
+              key={selectedOpt.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className={`rich text-base sm:text-lg leading-relaxed mt-4 ${
+                selectedOpt.correct ? 'text-green-800' : 'text-red-800'
+              }`}
+              dangerouslySetInnerHTML={{
+                __html:
+                  selectedOpt.responseHtml ||
+                  (selectedOpt.correct ? 'Correct!' : 'Not quite — try again.'),
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </SnapShell>
+  );
+}
+
+// ───── Built-in fallback (when no screens authored) ─────────
+
+function FallbackContent({
+  onAdvanceToPuzzle,
+}: {
+  onAdvanceToPuzzle: () => void;
+}) {
+  return (
+    <>
+      <SnapShell id="s-eq-intro">
+        <Heading>What is historical contextualisation?</Heading>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Body>
+          Contextualisation is the process of understanding people, ideas,
+          and events in the past within their specific time and place.
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Body>
+          We wouldn't look at the church and say that the Stanfords wanted
+          to build this university because it was located in Silicon Valley.
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Heading>Why not? Discuss.</Heading>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Body>
+          Because the university was built long before Silicon Valley was
+          a thing!
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Body className="italic text-stone-700">
+          Let's find an example you might relate to…
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Body>
+          You left a cake in the fridge at school on Friday. When you went
+          back to the fridge on Monday, it was gone. Who took it?
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Tag>Clue A</Tag>
+        <Body>
+          Your friend <strong>Jason</strong> was eating a cake last Thursday.
+          It must have been him.
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Tag>Clue B</Tag>
+        <Body>
+          Early in the morning, your roommate <strong>Margot</strong> was
+          eating a cake. Got her!
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell>
+        <Tag>Clue C</Tag>
+        <Body>
+          On your way out of school, you saw a <strong>cleaner</strong>{' '}
+          walking into the fridge with a big bag full of trash. Maybe?
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell wide>
+        <CakeQuestion onCorrect={onAdvanceToPuzzle} />
+      </SnapShell>
+
+      <SnapShell id="s-puzzle-intro">
+        <Body>
+          Historical contextualisation is a lot like putting together a
+          puzzle. You can't use a piece from a different puzzle and expect
+          it to fit. You also can't just use any random piece from the
+          same puzzle unless it's the one right next to it.
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+
+      <SnapShell wide>
+        <PuzzleAnimation />
+      </SnapShell>
+
+      <SnapShell>
+        <Body>
+          In history, we are trying to find pieces of the puzzle across
+          time and space. Let's go back to answering our question.
+        </Body>
+        <ScrollHint />
+      </SnapShell>
+    </>
+  );
+}
+
+// ───── Layout primitives ────────────────────────────────────
+
+function SnapShell({
   id,
   wide = false,
+  children,
 }: {
-  children: React.ReactNode;
-  id: string;
+  id?: string;
   wide?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <section
       id={id}
-      className="snap-start min-h-[100dvh] w-full flex flex-col items-center justify-center px-4 py-12"
+      className="snap-start snap-always min-h-[100dvh] w-full flex flex-col items-center justify-center px-4 py-12"
     >
       <div
         className={`${
           wide ? 'max-w-2xl' : 'max-w-xl'
-        } w-full mx-auto rounded-2xl shadow-2xl px-6 sm:px-10 py-10 sm:py-14 text-center`}
+        } w-full mx-auto rounded-2xl shadow-2xl px-6 sm:px-10 py-10 sm:py-14 text-center space-y-5`}
         style={{
           background: 'rgba(255, 255, 255, 0.82)',
           backdropFilter: 'blur(14px)',
@@ -252,27 +419,13 @@ function Body({
   );
 }
 
-function Clue({
-  tag,
-  children,
-}: {
-  tag: string;
-  children: React.ReactNode;
-}) {
+function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div
-        className="text-xs uppercase tracking-[0.3em]"
-        style={{ color: 'var(--th-secondary, #b8752b)' }}
-      >
-        {tag}
-      </div>
-      <p
-        className="text-xl sm:text-2xl leading-relaxed"
-        style={{ color: 'var(--th-text, #3a3a32)' }}
-      >
-        {children}
-      </p>
+    <div
+      className="text-xs uppercase tracking-[0.3em]"
+      style={{ color: 'var(--th-secondary, #b8752b)' }}
+    >
+      {children}
     </div>
   );
 }
@@ -291,18 +444,9 @@ function ScrollHint() {
   );
 }
 
-// ───── Cake question ─────────────────────────────────────────
+// ───── Built-in cake question (used in fallback) ────────────
 
-type CakeChoice = 'A' | 'B' | 'C';
-
-interface CakeOption {
-  id: CakeChoice;
-  label: string;
-  correct: boolean;
-  explanation: string;
-}
-
-const CAKE_OPTIONS: CakeOption[] = [
+const CAKE_OPTIONS = [
   {
     id: 'A',
     label: 'Jason',
@@ -327,10 +471,10 @@ const CAKE_OPTIONS: CakeOption[] = [
 ];
 
 function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
-  const [selected, setSelected] = useState<CakeChoice | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const handledCorrectRef = useRef(false);
 
-  const handleClick = (id: CakeChoice) => {
+  const handleClick = (id: string) => {
     setSelected(id);
     const opt = CAKE_OPTIONS.find((o) => o.id === id)!;
     if (opt.correct && !handledCorrectRef.current) {
@@ -373,7 +517,6 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
           );
         })}
       </div>
-
       <AnimatePresence mode="wait">
         {selectedOpt && (
           <motion.div
@@ -394,7 +537,7 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
   );
 }
 
-// ───── Puzzle animation ─────────────────────────────────────
+// ───── Built-in puzzle animation (used in fallback) ─────────
 
 const PATH_TAB_RIGHT  = 'M 0 0 H 60 V 22 a 8 8 0 0 1 0 16 V 60 H 0 Z';
 const PATH_SOCKET_LEFT = 'M 0 0 H 60 V 60 H 0 V 38 a 8 8 0 0 1 0 -16 V 0 Z';
@@ -434,16 +577,10 @@ function PuzzleAnimation() {
       </div>
 
       <div className="relative h-44 w-full max-w-md mx-auto">
-        <svg
-          viewBox="-10 -10 260 80"
-          className="w-full h-full"
-          aria-label="Puzzle pieces"
-        >
+        <svg viewBox="-10 -10 260 80" className="w-full h-full">
           <g transform="translate(20, 0)">
             <path d={PATH_TAB_RIGHT} fill="#3b82f6" stroke="#1e3a8a" strokeWidth="1.5" />
-            <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
-              1
-            </text>
+            <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">1</text>
           </g>
 
           <AnimatePresence mode="wait">
@@ -461,9 +598,7 @@ function PuzzleAnimation() {
               >
                 <g transform="translate(0, 0)">
                   <path d={PATH_TAB_LEFT} fill="#dc2626" stroke="#7f1d1d" strokeWidth="1.5" />
-                  <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
-                    2
-                  </text>
+                  <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">2</text>
                 </g>
               </motion.g>
             )}
@@ -477,9 +612,7 @@ function PuzzleAnimation() {
               >
                 <g transform="translate(0, 0)">
                   <path d={PATH_SOCKET_LEFT} fill="#60a5fa" stroke="#1e3a8a" strokeWidth="1.5" />
-                  <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
-                    1
-                  </text>
+                  <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">1</text>
                 </g>
               </motion.g>
             )}
@@ -511,15 +644,6 @@ function PuzzleAnimation() {
           )}
         </AnimatePresence>
       </div>
-
-      <p
-        className="text-sm"
-        style={{ color: 'var(--th-text-muted, #6b6b61)' }}
-      >
-        {isFail
-          ? "Two pieces from two different puzzles. They look like they should fit — they don't."
-          : 'Both pieces from the same puzzle. They interlock.'}
-      </p>
     </div>
   );
 }

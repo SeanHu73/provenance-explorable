@@ -23,6 +23,7 @@ import {
 import SinglePhotoField from '@/components/explorable/admin/SinglePhotoField';
 import BuildingTriggersEditor from '@/components/explorable/admin/BuildingTriggersEditor';
 import BoundsEditor from '@/components/explorable/admin/BoundsEditor';
+import ScreensEditor from '@/components/explorable/admin/ScreensEditor';
 
 const ContextualisationExplainer = dynamic(
   () => import('@/components/explorable/ContextualisationExplainer'),
@@ -100,23 +101,9 @@ export default function ExplorableAdminPage() {
           </div>
         </section>
 
-        <section className="mb-6 p-4 bg-indigo-50 border border-indigo-300 rounded">
-          <h2 className="font-semibold text-indigo-900 mb-1">
-            Preview: Contextualisation Explainer
-          </h2>
-          <p className="text-sm text-indigo-900 mb-3 leading-relaxed">
-            Snap-scroll lesson shown between Exploration Phase 1 and the
-            first evidence sort. Cake whodunnit + puzzle metaphor.
-            Restates whatever essential question is saved above.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowExplainer(true)}
-            className="px-4 py-2 rounded bg-indigo-700 text-white text-sm hover:bg-indigo-800"
-          >
-            Preview animation
-          </button>
-        </section>
+        <ExplainerScreensSection
+          onPreview={() => setShowExplainer(true)}
+        />
 
         {showExplainer && (
           <ContextualisationExplainer onClose={() => setShowExplainer(false)} />
@@ -279,5 +266,75 @@ function EssentialQuestionEditor() {
         )}
       </section>
     </>
+  );
+}
+
+function ExplainerScreensSection({ onPreview }: { onPreview: () => void }) {
+  const [config, setConfig] = useState<ExplorableConfig>(DEFAULT_CONFIG);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const c = await getConfig();
+      if (!alive) return;
+      setConfig(c);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const save = useCallback((c: ExplorableConfig) => saveConfig(c), []);
+
+  const { status } = useAutoSave({
+    value: loading ? DEFAULT_CONFIG : config,
+    save,
+    delayMs: 1000,
+  });
+
+  const screenCount = config.explainerScreens.length;
+
+  return (
+    <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
+      <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
+        <h2 className="font-semibold text-lg">Contextualisation Explainer</h2>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
+            {autoSaveLabel(status) || (
+              <span className="text-stone-400">All changes saved</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={onPreview}
+            className="px-3 py-1.5 rounded bg-indigo-700 text-white text-sm hover:bg-indigo-800"
+          >
+            Preview
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-stone-600 mb-3">
+        Snap-scroll lesson shown between Exploration Phase 1 and the first
+        evidence sort. Add text screens for narration and question screens
+        for interactive moments. The Essential Question is appended
+        automatically as the final screen.
+      </p>
+      <p className="text-xs text-stone-500 mb-3">
+        {screenCount === 0
+          ? 'Empty — the built-in fallback (cake whodunnit + puzzle animation) will play.'
+          : `${screenCount} authored screen${screenCount === 1 ? '' : 's'} + EQ.`}
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-stone-500">Loading…</p>
+      ) : (
+        <ScreensEditor
+          value={config.explainerScreens}
+          onChange={(explainerScreens) =>
+            setConfig({ ...config, explainerScreens })
+          }
+        />
+      )}
+    </section>
   );
 }
