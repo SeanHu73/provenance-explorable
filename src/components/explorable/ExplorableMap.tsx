@@ -45,6 +45,7 @@ import { useEffect } from 'react';
 import DevLocationOverlay from './DevLocationOverlay';
 import WarmHalo from './WarmHalo';
 import StopPinMarker, { PinVariant } from './StopPinMarker';
+import { AnimatePresence, motion } from 'framer-motion';
 import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
 import IndoorPromptOverlay from './IndoorPromptOverlay';
@@ -94,6 +95,7 @@ export default function ExplorableMap() {
   // Dev mode reveals an extra "Lesson preview" menu so authors can
   // open the explainer without collecting 4 stops first.
   const [devMode, setDevMode] = useState(false);
+  const [devMenuOpen, setDevMenuOpen] = useState(false);
 
   useEffect(() => {
     const envFlag = process.env.NEXT_PUBLIC_ENABLE_DEV_LOC === 'true';
@@ -326,27 +328,66 @@ export default function ExplorableMap() {
         )}
       </button>
 
-      {/* Dev-only shortcuts — stacked bottom-right so authors can
-          test each modal without going through the full game flow. */}
+      {/* Dev-only shortcuts. Small toggle button bottom-right; tap to
+          reveal the four shortcuts stacked above it. */}
       {devMode && (
-        <div className="absolute bottom-5 right-4 z-30 flex flex-col gap-1 items-end">
-          <DevShortcutBtn
-            onClick={() => {
-              setExplainerPending(false);
-              setExplainerOpen(true);
-            }}
+        <div className="absolute bottom-5 right-4 z-30 flex flex-col gap-1.5 items-end">
+          <AnimatePresence>
+            {devMenuOpen && (
+              <motion.div
+                key="dev-menu"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.15 }}
+                className="flex flex-col gap-1 items-end"
+              >
+                <DevShortcutBtn
+                  onClick={() => {
+                    setExplainerPending(false);
+                    setExplainerOpen(true);
+                    setDevMenuOpen(false);
+                  }}
+                >
+                  Lesson preview
+                </DevShortcutBtn>
+                <DevShortcutBtn
+                  onClick={() => {
+                    setMidwaySortOpen(true);
+                    setDevMenuOpen(false);
+                  }}
+                >
+                  Midway sort
+                </DevShortcutBtn>
+                <DevShortcutBtn
+                  onClick={() => {
+                    setFinalSortOpen(true);
+                    setDevMenuOpen(false);
+                  }}
+                >
+                  Final sort
+                </DevShortcutBtn>
+                <DevShortcutBtn
+                  onClick={() => {
+                    setRevealOpen(true);
+                    setDevMenuOpen(false);
+                  }}
+                >
+                  Reveal
+                </DevShortcutBtn>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={() => setDevMenuOpen((v) => !v)}
+            className="w-9 h-9 inline-flex items-center justify-center rounded-full bg-stone-900/80 hover:bg-stone-900 text-white text-[11px] font-semibold backdrop-blur-sm shadow"
+            aria-label={devMenuOpen ? 'Close dev menu' : 'Open dev menu'}
+            title="Dev menu"
           >
-            Dev · Lesson preview
-          </DevShortcutBtn>
-          <DevShortcutBtn onClick={() => setMidwaySortOpen(true)}>
-            Dev · Midway sort
-          </DevShortcutBtn>
-          <DevShortcutBtn onClick={() => setFinalSortOpen(true)}>
-            Dev · Final sort
-          </DevShortcutBtn>
-          <DevShortcutBtn onClick={() => setRevealOpen(true)}>
-            Dev · Reveal
-          </DevShortcutBtn>
+            {devMenuOpen ? '×' : 'Dev'}
+          </button>
         </div>
       )}
 
