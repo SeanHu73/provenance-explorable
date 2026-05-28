@@ -1,17 +1,28 @@
 'use client';
 
 /**
- * Lightweight rich text editor — contentEditable + a small toolbar.
- * Per-selection formatting (bold, italic, color, size) — exactly what
- * the author asked for. Output is HTML, stored as a string.
+ * Rich text editor built on TipTap.
  *
- * Uses document.execCommand under the hood. It's "deprecated" but
- * universally supported and good enough for an admin tool. If we ever
- * outgrow it (mobile editing, structured paste, undo polish), swap in
- * TipTap and keep the same prop signature.
+ * Why TipTap: the contentEditable+execCommand version we shipped first
+ * was buggy — selection got lost when opening dropdowns and the custom
+ * font-size logic nested spans. TipTap manages selection cleanly.
+ *
+ * Editor typography is set to match the player (Newsreader serif at
+ * ~20 px on a light surface) so the admin view is WYSIWYG.
+ *
+ * Marks supported:
+ *   - bold / italic (starter kit)
+ *   - color (via @tiptap/extension-text-style + extension-color)
+ *   - font size (custom mark below — same textStyle node, adds a
+ *     fontSize attribute and renders it as inline style)
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer } from 'react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import { StarterKit } from '@tiptap/starter-kit';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
 
 interface Props {
   value: string;
@@ -20,8 +31,8 @@ interface Props {
   minHeight?: number;
 }
 
-const COLORS = [
-  { name: 'Default', value: 'inherit' },
+const COLORS: Array<{ name: string; value: string | null }> = [
+  { name: 'Default', value: null },
   { name: 'Black',   value: '#1c1917' },
   { name: 'Red',     value: '#b91c1c' },
   { name: 'Crimson', value: '#8b2538' },
@@ -32,212 +43,256 @@ const COLORS = [
   { name: 'Indigo',  value: '#4338ca' },
 ];
 
-const SIZES: Array<{ label: string; px: number }> = [
-  { label: 'S',  px: 14 },
-  { label: 'M',  px: 18 },
-  { label: 'L',  px: 24 },
-  { label: 'XL', px: 36 },
+const SIZES: Array<{ label: string; value: string | null }> = [
+  { label: 'Default', value: null },
+  { label: 'S',  value: '14px' },
+  { label: 'M',  value: '18px' },
+  { label: 'L',  value: '24px' },
+  { label: 'XL', value: '36px' },
 ];
+
+// Custom mark: adds a fontSize attribute on the textStyle mark. TipTap
+// merges marks of the same type, so re-applying a size cleanly replaces.
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    fontSize: {
+      setFontSize: (size: string) => ReturnType;
+      unsetFontSize: () => ReturnType;
+    };
+  }
+}
+
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element: HTMLElement) =>
+              element.style.fontSize || null,
+            renderHTML: (attributes: { fontSize?: string | null }) => {
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontSize:
+        (size: string) =>
+        ({ chain }) =>
+          chain().setMark('textStyle', { fontSize: size }).run(),
+      unsetFontSize:
+        () =>
+        ({ chain }) =>
+          chain()
+            .setMark('textStyle', { fontSize: null })
+            .removeEmptyTextStyle()
+            .run(),
+    };
+  },
+});
 
 export default function RichTextEditor({
   value,
   onChange,
   placeholder,
-  minHeight = 120,
+  minHeight = 140,
 }: Props) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const lastEmitted = useRef<string>(value);
-  const [colorOpen, setColorOpen] = useState(false);
-  const [sizeOpen, setSizeOpen] = useState(false);
+  const editor = useEditor({
+    extensions: [StarterKit, TextStyle, Color, FontSize],
+    content: value,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'focus:outline-none px-3 py-3 leading-relaxed',
+        style: `min-height: ${minHeight}px; font-family: var(--font-newsreader), Georgia, serif; font-size: 20px; color: #3a3a32;`,
+      },
+    },
+    onUpdate: ({ editor: ed }) => onChange(ed.getHTML()),
+  });
 
-  // Mount the initial value once. After that, the contentEditable owns
-  // the DOM and we don't push prop changes back in (would lose caret).
+  // External value changes (e.g. switching screens) reset the editor.
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value;
-      lastEmitted.current = value;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!editor) return;
+    if (editor.getHTML() === value) return;
+    editor.commands.setContent(value || '');
+  }, [value, editor]);
 
-  function exec(command: string, arg?: string) {
-    // Make sure the selection is in our editor before applying.
-    editorRef.current?.focus();
-    document.execCommand(command, false, arg);
-    emit();
-    setColorOpen(false);
-    setSizeOpen(false);
-  }
-
-  function applyFontSize(px: number) {
-    // execCommand fontSize only takes 1-7; do it ourselves with a span.
-    editorRef.current?.focus();
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      // Nothing selected — change subsequent typing by leaving a
-      // styled span at the caret.
-      const span = document.createElement('span');
-      span.style.fontSize = `${px}px`;
-      span.appendChild(document.createTextNode('​'));
-      sel?.getRangeAt(0).insertNode(span);
-      const range = document.createRange();
-      range.setStart(span.firstChild!, 1);
-      range.collapse(true);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    } else {
-      const range = sel.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontSize = `${px}px`;
-      span.appendChild(range.extractContents());
-      range.insertNode(span);
-    }
-    emit();
-    setSizeOpen(false);
-    setColorOpen(false);
-  }
-
-  function emit() {
-    if (!editorRef.current) return;
-    const html = editorRef.current.innerHTML;
-    if (html === lastEmitted.current) return;
-    lastEmitted.current = html;
-    onChange(html);
+  if (!editor) {
+    return (
+      <div
+        className="border border-stone-300 rounded bg-white"
+        style={{ minHeight }}
+      />
+    );
   }
 
   return (
     <div className="border border-stone-300 rounded bg-white">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50 rounded-t text-sm">
-        <ToolBtn label="B" onClick={() => exec('bold')} bold />
-        <ToolBtn label="I" onClick={() => exec('italic')} italic />
-
-        <div className="w-px h-5 bg-stone-300 mx-1" />
-
-        {/* Color */}
-        <div className="relative">
-          <ToolBtn
-            label="A"
-            onClick={() => { setColorOpen((v) => !v); setSizeOpen(false); }}
-            style={{ textDecoration: 'underline' }}
-            aria-label="Text color"
-          />
-          {colorOpen && (
-            <div className="absolute z-10 mt-1 p-2 bg-white border border-stone-300 rounded shadow-lg grid grid-cols-3 gap-1.5 w-44">
-              {COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() =>
-                    c.value === 'inherit'
-                      ? exec('removeFormat')
-                      : exec('foreColor', c.value)
-                  }
-                  className="flex items-center gap-1 text-[11px] px-1.5 py-1 border border-stone-200 rounded hover:bg-stone-50"
-                  title={c.name}
-                >
-                  <span
-                    className="w-3 h-3 rounded-sm border border-stone-300"
-                    style={{
-                      background: c.value === 'inherit' ? 'white' : c.value,
-                    }}
-                  />
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Size */}
-        <div className="relative">
-          <ToolBtn
-            label="Aa"
-            onClick={() => { setSizeOpen((v) => !v); setColorOpen(false); }}
-            aria-label="Font size"
-          />
-          {sizeOpen && (
-            <div className="absolute z-10 mt-1 p-1 bg-white border border-stone-300 rounded shadow-lg grid grid-cols-1 gap-0.5 w-24">
-              {SIZES.map((s) => (
-                <button
-                  key={s.px}
-                  type="button"
-                  onClick={() => applyFontSize(s.px)}
-                  className="text-left px-2 py-1 rounded hover:bg-stone-100 text-stone-800"
-                  style={{ fontSize: `${Math.min(s.px, 22)}px`, lineHeight: 1.2 }}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="w-px h-5 bg-stone-300 mx-1" />
-
-        <ToolBtn label="↺" onClick={() => exec('undo')} aria-label="Undo" />
-        <ToolBtn label="↻" onClick={() => exec('redo')} aria-label="Redo" />
-        <ToolBtn
-          label="Clear"
-          onClick={() => exec('removeFormat')}
-          aria-label="Clear formatting"
-        />
-      </div>
-
-      {/* Editor */}
+      <Toolbar editor={editor} />
       <div className="relative">
-        {value === '' && placeholder && (
+        {editor.isEmpty && placeholder && (
           <div
-            className="absolute top-3 left-3 text-stone-400 pointer-events-none text-sm"
+            className="absolute top-3 left-3 text-stone-400 pointer-events-none"
+            style={{
+              fontFamily: 'var(--font-newsreader), Georgia, serif',
+              fontSize: '20px',
+            }}
             aria-hidden
           >
             {placeholder}
           </div>
         )}
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={emit}
-          onBlur={emit}
-          className="px-3 py-2.5 text-base focus:outline-none"
-          style={{
-            minHeight,
-            // Reset Prose colors so applied colors stick.
-            color: 'inherit',
-          }}
-        />
+        <EditorContent editor={editor} />
       </div>
     </div>
   );
 }
 
-interface ToolBtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  label: string;
-  bold?: boolean;
-  italic?: boolean;
+// ───── Toolbar ────────────────────────────────────────────────
+
+function Toolbar({ editor }: { editor: Editor }) {
+  // Force re-renders on selection/transaction so active styling tracks.
+  const [, tick] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const update = () => tick();
+    editor.on('selectionUpdate', update);
+    editor.on('transaction', update);
+    return () => {
+      editor.off('selectionUpdate', update);
+      editor.off('transaction', update);
+    };
+  }, [editor]);
+
+  const isBold = editor.isActive('bold');
+  const isItalic = editor.isActive('italic');
+  const currentColor = (editor.getAttributes('textStyle').color as string) || '';
+  const currentSize =
+    (editor.getAttributes('textStyle').fontSize as string) || '';
+
+  return (
+    <div className="flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50 rounded-t text-sm flex-wrap">
+      <Btn
+        active={isBold}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        label="B"
+        bold
+      />
+      <Btn
+        active={isItalic}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        label="I"
+        italic
+      />
+
+      <Divider />
+
+      <select
+        value={currentColor || ''}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (!v) editor.chain().focus().unsetColor().run();
+          else editor.chain().focus().setColor(v).run();
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+        className="text-xs px-1.5 py-1 border border-stone-300 rounded bg-white"
+        title="Text color"
+        style={{ color: currentColor || undefined, fontWeight: 600 }}
+      >
+        {COLORS.map((c) => (
+          <option
+            key={c.name}
+            value={c.value ?? ''}
+            style={{ color: c.value || 'inherit' }}
+          >
+            {c.name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={currentSize || ''}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (!v) editor.chain().focus().unsetFontSize().run();
+          else editor.chain().focus().setFontSize(v).run();
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+        className="text-xs px-1.5 py-1 border border-stone-300 rounded bg-white"
+        title="Font size"
+      >
+        {SIZES.map((s) => (
+          <option key={s.label} value={s.value ?? ''}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+
+      <Divider />
+
+      <Btn
+        onClick={() => editor.chain().focus().undo().run()}
+        label="↺"
+        ariaLabel="Undo"
+      />
+      <Btn
+        onClick={() => editor.chain().focus().redo().run()}
+        label="↻"
+        ariaLabel="Redo"
+      />
+      <Btn
+        onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
+        label="Clear"
+        ariaLabel="Clear formatting"
+      />
+    </div>
+  );
 }
 
-function ToolBtn({
+function Divider() {
+  return <div className="w-px h-5 bg-stone-300 mx-1" />;
+}
+
+interface BtnProps {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  bold?: boolean;
+  italic?: boolean;
+  ariaLabel?: string;
+}
+
+function Btn({
   label,
-  bold,
-  italic,
   onClick,
-  style,
-  ...rest
-}: ToolBtnProps) {
+  active = false,
+  bold = false,
+  italic = false,
+  ariaLabel,
+}: BtnProps) {
   return (
     <button
       type="button"
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      onMouseDown={(e) => e.preventDefault()} // don't lose selection
-      className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-stone-200 text-stone-700"
+      aria-label={ariaLabel}
+      className={`w-7 h-7 inline-flex items-center justify-center rounded text-stone-700 ${
+        active ? 'bg-stone-300' : 'hover:bg-stone-200'
+      }`}
       style={{
         fontWeight: bold ? 700 : undefined,
         fontStyle: italic ? 'italic' : undefined,
-        ...style,
       }}
-      {...rest}
     >
       {label}
     </button>

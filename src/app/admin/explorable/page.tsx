@@ -53,6 +53,12 @@ export default function ExplorableAdminPage() {
               Manage stops →
             </Link>
             <Link
+              href="/admin/explorable/overview"
+              className="text-blue-700 hover:underline font-semibold"
+            >
+              All-stops map →
+            </Link>
+            <Link
               href="/explorable"
               className="text-blue-700 hover:underline font-semibold"
             >
@@ -243,29 +249,75 @@ function EssentialQuestionEditor() {
         )}
       </section>
 
-      <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
-        <div className="flex items-baseline justify-between mb-1 gap-3">
-          <h2 className="font-semibold text-lg">Indoor Triggers</h2>
-          {saveIndicator}
-        </div>
-        <p className="text-xs text-stone-600 mb-3">
-          Invisible zones used to gate the "I'm inside Memorial Church"
-          button. The button only appears once the player enters one of
-          these radii. Use one trigger per building entrance.
-        </p>
+      <TriggersCollapsible
+        value={config.buildingTriggers}
+        loading={loading}
+        saveIndicator={saveIndicator}
+        onChange={(buildingTriggers) =>
+          setConfig({ ...config, buildingTriggers })
+        }
+      />
+    </>
+  );
+}
 
-        {loading ? (
+function TriggersCollapsible({
+  value,
+  loading,
+  saveIndicator,
+  onChange,
+}: {
+  value: import('@/lib/explorable/config-store').BuildingTrigger[];
+  loading: boolean;
+  saveIndicator: React.ReactNode;
+  onChange: (
+    next: import('@/lib/explorable/config-store').BuildingTrigger[],
+  ) => void;
+}) {
+  // Collapse by default if there are triggers (the editor is bulky);
+  // expand when empty so first-time users see the affordance.
+  const [open, setOpen] = useState(value.length === 0);
+
+  return (
+    <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-baseline justify-between gap-3 mb-1"
+      >
+        <h2 className="font-semibold text-lg flex items-center gap-2">
+          <span
+            className="inline-block transition-transform text-stone-500"
+            style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}
+            aria-hidden
+          >
+            ▶
+          </span>
+          Indoor Triggers
+          <span className="text-xs font-normal text-stone-500">
+            ({value.length})
+          </span>
+        </h2>
+        {saveIndicator}
+      </button>
+      <p className="text-xs text-stone-600 mb-3">
+        Invisible zones used to gate the "I'm inside Memorial Church"
+        prompt. The prompt only appears once the player enters one of
+        these radii. Use one trigger per building entrance.
+      </p>
+
+      {open ? (
+        loading ? (
           <p className="text-sm text-stone-500">Loading…</p>
         ) : (
-          <BuildingTriggersEditor
-            value={config.buildingTriggers}
-            onChange={(buildingTriggers) =>
-              setConfig({ ...config, buildingTriggers })
-            }
-          />
-        )}
-      </section>
-    </>
+          <BuildingTriggersEditor value={value} onChange={onChange} />
+        )
+      ) : (
+        <p className="text-xs text-stone-500 italic">
+          Collapsed. Click the heading to edit.
+        </p>
+      )}
+    </section>
   );
 }
 
