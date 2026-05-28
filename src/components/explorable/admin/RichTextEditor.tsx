@@ -19,7 +19,7 @@
 
 import { useEffect, useReducer } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
-import { Extension } from '@tiptap/core';
+import { Mark } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
@@ -51,8 +51,9 @@ const SIZES: Array<{ label: string; value: string | null }> = [
   { label: 'XL', value: '36px' },
 ];
 
-// Custom mark: adds a fontSize attribute on the textStyle mark. TipTap
-// merges marks of the same type, so re-applying a size cleanly replaces.
+// Standalone fontSize mark. Wraps the selection in
+// <span style="font-size: Xpx">. Reapplying replaces — TipTap merges
+// same-type marks. Independent of textStyle so it doesn't fight Color.
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     fontSize: {
@@ -62,42 +63,43 @@ declare module '@tiptap/core' {
   }
 }
 
-const FontSize = Extension.create({
+const FontSize = Mark.create({
   name: 'fontSize',
-  addOptions() {
-    return { types: ['textStyle'] };
+
+  addAttributes() {
+    return {
+      fontSize: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.fontSize || null,
+        renderHTML: (attrs: { fontSize?: string | null }) =>
+          attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {},
+      },
+    };
   },
-  addGlobalAttributes() {
+
+  parseHTML() {
     return [
       {
-        types: this.options.types,
-        attributes: {
-          fontSize: {
-            default: null,
-            parseHTML: (element: HTMLElement) =>
-              element.style.fontSize || null,
-            renderHTML: (attributes: { fontSize?: string | null }) => {
-              if (!attributes.fontSize) return {};
-              return { style: `font-size: ${attributes.fontSize}` };
-            },
-          },
-        },
+        style: 'font-size',
+        getAttrs: (value: string) => (value ? { fontSize: value } : false),
       },
     ];
   },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', HTMLAttributes, 0];
+  },
+
   addCommands() {
     return {
       setFontSize:
         (size: string) =>
-        ({ chain }) =>
-          chain().setMark('textStyle', { fontSize: size }).run(),
+        ({ commands }) =>
+          commands.setMark(this.name, { fontSize: size }),
       unsetFontSize:
         () =>
-        ({ chain }) =>
-          chain()
-            .setMark('textStyle', { fontSize: null })
-            .removeEmptyTextStyle()
-            .run(),
+        ({ commands }) =>
+          commands.unsetMark(this.name),
     };
   },
 });
@@ -178,7 +180,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   const isItalic = editor.isActive('italic');
   const currentColor = (editor.getAttributes('textStyle').color as string) || '';
   const currentSize =
-    (editor.getAttributes('textStyle').fontSize as string) || '';
+    (editor.getAttributes('fontSize').fontSize as string) || '';
 
   return (
     <div className="flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50 rounded-t text-sm flex-wrap">
@@ -204,7 +206,6 @@ function Toolbar({ editor }: { editor: Editor }) {
           if (!v) editor.chain().focus().unsetColor().run();
           else editor.chain().focus().setColor(v).run();
         }}
-        onMouseDown={(e) => e.preventDefault()}
         className="text-xs px-1.5 py-1 border border-stone-300 rounded bg-white"
         title="Text color"
         style={{ color: currentColor || undefined, fontWeight: 600 }}
@@ -227,7 +228,6 @@ function Toolbar({ editor }: { editor: Editor }) {
           if (!v) editor.chain().focus().unsetFontSize().run();
           else editor.chain().focus().setFontSize(v).run();
         }}
-        onMouseDown={(e) => e.preventDefault()}
         className="text-xs px-1.5 py-1 border border-stone-300 rounded bg-white"
         title="Font size"
       >
