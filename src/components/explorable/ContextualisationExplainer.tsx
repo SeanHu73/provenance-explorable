@@ -1,11 +1,14 @@
 'use client';
 
 /**
- * The midway "What is contextualisation?" lesson, shown to players
- * between Exploration Phase 1 and the first evidence sort.
+ * The midway "What is contextualisation?" lesson.
  *
- * Format: full-screen modal, snap-scroll, one idea per screen. Two
- * interactive beats:
+ * Visual treatment mirrors Provenance: the game-level background photo
+ * sits fixed behind every screen; each section's content lives in a
+ * translucent, backdrop-blurred card. Falls back to a warm neutral if
+ * no background photo is set.
+ *
+ * Two interactive beats:
  *   - the cake whodunnit (multiple choice A/B/C — wrong choices show
  *     a red explanation, correct choice turns green and auto-scrolls)
  *   - the puzzle animation (two pieces from different puzzles refuse
@@ -26,10 +29,13 @@ interface Props {
 export default function ContextualisationExplainer({ onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [eq, setEq] = useState<string>('');
+  const [bgPhoto, setBgPhoto] = useState<string | null>(null);
 
   useEffect(() => {
-    getConfig().then((c) => setEq(c.essentialQuestion || 'What is this place for?'));
-    // Reset scroll on open
+    getConfig().then((c) => {
+      setEq(c.essentialQuestion || 'What is this place for?');
+      setBgPhoto(c.backgroundPhotoUrl);
+    });
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }, []);
 
@@ -40,12 +46,29 @@ export default function ContextualisationExplainer({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-stone-950 text-stone-100"
-      style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
+      className="fixed inset-0 z-50"
+      style={{
+        fontFamily: 'var(--font-newsreader), Georgia, serif',
+        backgroundColor: '#e9e4e2', // theme bg color, shown if no photo
+      }}
     >
+      {/* Fixed background photo */}
+      {bgPhoto && (
+        <div className="absolute inset-0 z-0">
+          <img
+            src={bgPhoto}
+            alt=""
+            className="w-full h-full object-cover"
+            style={{ filter: 'contrast(100%)' }}
+          />
+        </div>
+      )}
+
+      {/* Close button — high contrast so it reads on either light or
+          photo background */}
       <button
         onClick={onClose}
-        className="absolute top-3 right-3 z-20 w-10 h-10 rounded-full bg-stone-800/80 hover:bg-stone-700 text-2xl leading-none flex items-center justify-center"
+        className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-stone-900 text-2xl leading-none flex items-center justify-center shadow-lg backdrop-blur-sm"
         aria-label="Close explainer"
       >
         ×
@@ -53,7 +76,7 @@ export default function ContextualisationExplainer({ onClose }: Props) {
 
       <div
         ref={containerRef}
-        className="h-[100dvh] w-full overflow-y-auto snap-y snap-mandatory"
+        className="relative z-10 h-[100dvh] w-full overflow-y-auto snap-y snap-mandatory"
       >
         <Section id="s-eq">
           <Heading>What is historical contextualisation?</Heading>
@@ -90,7 +113,7 @@ export default function ContextualisationExplainer({ onClose }: Props) {
         </Section>
 
         <Section id="s-transition">
-          <Body className="italic text-stone-300">
+          <Body className="italic text-stone-700">
             Let's find an example you might relate to…
           </Body>
           <ScrollHint />
@@ -128,7 +151,7 @@ export default function ContextualisationExplainer({ onClose }: Props) {
           <ScrollHint />
         </Section>
 
-        <Section id="s-question">
+        <Section id="s-question" wide>
           <CakeQuestion onCorrect={() => scrollTo('s-puzzle-intro')} />
         </Section>
 
@@ -142,7 +165,7 @@ export default function ContextualisationExplainer({ onClose }: Props) {
           <ScrollHint />
         </Section>
 
-        <Section id="s-puzzle-anim">
+        <Section id="s-puzzle-anim" wide>
           <PuzzleAnimation />
         </Section>
 
@@ -155,7 +178,7 @@ export default function ContextualisationExplainer({ onClose }: Props) {
         </Section>
 
         <Section id="s-eq-restated">
-          <div className="text-xs uppercase tracking-[0.3em] text-stone-400 mb-4">
+          <div className="text-xs uppercase tracking-[0.3em] text-stone-500 mb-4">
             Our essential question
           </div>
           <Heading>{eq || 'What is this place for?'}</Heading>
@@ -170,23 +193,43 @@ export default function ContextualisationExplainer({ onClose }: Props) {
 function Section({
   children,
   id,
+  wide = false,
 }: {
   children: React.ReactNode;
   id: string;
+  wide?: boolean;
 }) {
   return (
     <section
       id={id}
-      className="snap-start min-h-[100dvh] w-full flex flex-col items-center justify-center px-6 py-12 text-center"
+      className="snap-start min-h-[100dvh] w-full flex flex-col items-center justify-center px-4 py-12"
     >
-      <div className="max-w-2xl w-full mx-auto">{children}</div>
+      <div
+        className={`${
+          wide ? 'max-w-2xl' : 'max-w-xl'
+        } w-full mx-auto rounded-2xl shadow-2xl px-6 sm:px-10 py-10 sm:py-14 text-center`}
+        style={{
+          background: 'rgba(255, 255, 255, 0.82)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          color: 'var(--th-text, #3a3a32)',
+        }}
+      >
+        {children}
+      </div>
     </section>
   );
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-3xl sm:text-5xl font-semibold leading-tight">
+    <h2
+      className="text-3xl sm:text-5xl font-semibold leading-tight"
+      style={{
+        fontFamily: 'var(--font-dm-serif-display), Georgia, serif',
+        color: 'var(--th-primary, #8b2538)',
+      }}
+    >
       {children}
     </h2>
   );
@@ -200,7 +243,10 @@ function Body({
   className?: string;
 }) {
   return (
-    <p className={`text-xl sm:text-3xl leading-relaxed ${className}`}>
+    <p
+      className={`text-xl sm:text-2xl leading-relaxed ${className}`}
+      style={{ color: 'var(--th-text, #3a3a32)' }}
+    >
       {children}
     </p>
   );
@@ -215,10 +261,18 @@ function Clue({
 }) {
   return (
     <div className="space-y-3">
-      <div className="text-xs uppercase tracking-[0.3em] text-amber-400">
+      <div
+        className="text-xs uppercase tracking-[0.3em]"
+        style={{ color: 'var(--th-secondary, #b8752b)' }}
+      >
         {tag}
       </div>
-      <p className="text-xl sm:text-3xl leading-relaxed">{children}</p>
+      <p
+        className="text-xl sm:text-2xl leading-relaxed"
+        style={{ color: 'var(--th-text, #3a3a32)' }}
+      >
+        {children}
+      </p>
     </div>
   );
 }
@@ -228,7 +282,8 @@ function ScrollHint() {
     <motion.div
       animate={{ y: [0, 6, 0] }}
       transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-      className="mt-12 text-stone-500 text-sm"
+      className="mt-12 text-sm"
+      style={{ color: 'var(--th-text-muted, #6b6b61)' }}
       aria-hidden
     >
       ▼
@@ -280,7 +335,6 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
     const opt = CAKE_OPTIONS.find((o) => o.id === id)!;
     if (opt.correct && !handledCorrectRef.current) {
       handledCorrectRef.current = true;
-      // Brief pause so the green + "Correct!" lands before scrolling.
       setTimeout(onCorrect, 1600);
     }
   };
@@ -302,13 +356,16 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
               key={opt.id}
               type="button"
               onClick={() => handleClick(opt.id)}
-              className={`px-5 py-4 rounded-lg text-lg sm:text-xl text-left transition-colors border-2 ${
+              className={`px-5 py-4 rounded-lg text-lg sm:text-xl text-left transition-colors border-2 font-medium ${
                 isCorrect
-                  ? 'bg-green-700 border-green-300 text-white'
+                  ? 'bg-green-600 border-green-700 text-white'
                   : isWrong
-                  ? 'bg-red-700 border-red-300 text-white'
-                  : 'bg-stone-800 border-stone-600 hover:border-stone-400'
+                  ? 'bg-red-600 border-red-700 text-white'
+                  : 'bg-white/70 border-stone-300 text-stone-800 hover:bg-white hover:border-stone-500'
               }`}
+              style={{
+                fontFamily: 'var(--font-newsreader), Georgia, serif',
+              }}
             >
               <span className="font-mono mr-3 opacity-70">({opt.id})</span>
               {opt.label}
@@ -326,7 +383,7 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
             className={`text-base sm:text-lg leading-relaxed mt-4 ${
-              selectedOpt.correct ? 'text-green-300' : 'text-red-300'
+              selectedOpt.correct ? 'text-green-800' : 'text-red-800'
             }`}
           >
             {selectedOpt.explanation}
@@ -338,17 +395,6 @@ function CakeQuestion({ onCorrect }: { onCorrect: () => void }) {
 }
 
 // ───── Puzzle animation ─────────────────────────────────────
-
-/**
- * SVG paths (60x60 base square, all going clockwise from top-left):
- *
- *   TAB on right edge:    body extends to x=68 via a half-circle arc.
- *   SOCKET on left edge:  body has an inward arc at the left edge.
- *   TAB on left edge:     body extends to x=-8 (other puzzle).
- *
- * Piece A (tab right) + Piece B (socket left) = interlock perfectly.
- * Piece A (tab right) + Piece X (tab left)   = tabs collide.
- */
 
 const PATH_TAB_RIGHT  = 'M 0 0 H 60 V 22 a 8 8 0 0 1 0 16 V 60 H 0 Z';
 const PATH_SOCKET_LEFT = 'M 0 0 H 60 V 60 H 0 V 38 a 8 8 0 0 1 0 -16 V 0 Z';
@@ -366,7 +412,6 @@ function PuzzleAnimation() {
       setPhase('try1');
       return;
     }
-    // try1 already, advance through try2 and success.
     const t1 = setTimeout(() => setPhase('try2'), 3000);
     const t2 = setTimeout(() => setPhase('success'), 6000);
     return () => {
@@ -379,7 +424,10 @@ function PuzzleAnimation() {
 
   return (
     <div ref={ref} className="space-y-6">
-      <div className="text-xs uppercase tracking-[0.3em] text-stone-400">
+      <div
+        className="text-xs uppercase tracking-[0.3em]"
+        style={{ color: 'var(--th-text-muted, #6b6b61)' }}
+      >
         {phase === 'try1' && 'Different puzzles — try 1'}
         {phase === 'try2' && 'Different puzzles — try 2'}
         {phase === 'success' && 'Same puzzle — perfect fit'}
@@ -391,9 +439,8 @@ function PuzzleAnimation() {
           className="w-full h-full"
           aria-label="Puzzle pieces"
         >
-          {/* Piece A — Puzzle 1, tab right, blue (stationary) */}
           <g transform="translate(20, 0)">
-            <path d={PATH_TAB_RIGHT} fill="#3b82f6" stroke="#1e40af" strokeWidth="1.5" />
+            <path d={PATH_TAB_RIGHT} fill="#3b82f6" stroke="#1e3a8a" strokeWidth="1.5" />
             <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
               1
             </text>
@@ -412,9 +459,8 @@ function PuzzleAnimation() {
                   ease: 'easeInOut',
                 }}
               >
-                {/* Piece X — Puzzle 2, tab left, red */}
                 <g transform="translate(0, 0)">
-                  <path d={PATH_TAB_LEFT} fill="#ef4444" stroke="#991b1b" strokeWidth="1.5" />
+                  <path d={PATH_TAB_LEFT} fill="#dc2626" stroke="#7f1d1d" strokeWidth="1.5" />
                   <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
                     2
                   </text>
@@ -429,9 +475,8 @@ function PuzzleAnimation() {
                 animate={{ x: 80 }}
                 transition={{ duration: 0.9, ease: 'easeOut' }}
               >
-                {/* Piece B — Puzzle 1, socket left, blue (matches A) */}
                 <g transform="translate(0, 0)">
-                  <path d={PATH_SOCKET_LEFT} fill="#60a5fa" stroke="#1e40af" strokeWidth="1.5" />
+                  <path d={PATH_SOCKET_LEFT} fill="#60a5fa" stroke="#1e3a8a" strokeWidth="1.5" />
                   <text x="22" y="34" fontSize="10" fill="#fff" fontFamily="system-ui" fontWeight="600">
                     1
                   </text>
@@ -441,7 +486,6 @@ function PuzzleAnimation() {
           </AnimatePresence>
         </svg>
 
-        {/* Verdict mark — bounces in over the pieces */}
         <AnimatePresence>
           {isFail && (
             <motion.div
@@ -449,7 +493,7 @@ function PuzzleAnimation() {
               initial={{ opacity: 0, scale: 0.4 }}
               animate={{ opacity: [0, 0, 1, 1, 0], scale: [0.4, 0.4, 1.2, 1, 0.8] }}
               transition={{ duration: 2.8, times: [0, 0.45, 0.55, 0.85, 1] }}
-              className="absolute inset-0 flex items-center justify-center text-6xl text-red-400 font-bold pointer-events-none"
+              className="absolute inset-0 flex items-center justify-center text-6xl text-red-600 font-bold pointer-events-none"
             >
               ✕
             </motion.div>
@@ -460,7 +504,7 @@ function PuzzleAnimation() {
               initial={{ opacity: 0, scale: 0.4 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.9, duration: 0.4 }}
-              className="absolute inset-0 flex items-center justify-center text-6xl text-green-400 font-bold pointer-events-none"
+              className="absolute inset-0 flex items-center justify-center text-6xl text-green-700 font-bold pointer-events-none"
             >
               ✓
             </motion.div>
@@ -468,9 +512,12 @@ function PuzzleAnimation() {
         </AnimatePresence>
       </div>
 
-      <p className="text-sm text-stone-400">
+      <p
+        className="text-sm"
+        style={{ color: 'var(--th-text-muted, #6b6b61)' }}
+      >
         {isFail
-          ? 'Two pieces from two different puzzles. They look like they should fit — they don\'t.'
+          ? "Two pieces from two different puzzles. They look like they should fit — they don't."
           : 'Both pieces from the same puzzle. They interlock.'}
       </p>
     </div>

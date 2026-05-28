@@ -17,11 +17,15 @@ const DOC_ID = 'main';
 export interface ExplorableConfig {
   /** The essential question players see at start of game, midway sort, and final sort. */
   essentialQuestion: string;
+  /** Photo shown behind every player-facing screen (translucent cards
+   *  sit on top). Mirrors Provenance's Tour.backgroundPhotoUrl. */
+  backgroundPhotoUrl: string | null;
   updatedAt: string;
 }
 
 export const DEFAULT_CONFIG: ExplorableConfig = {
   essentialQuestion: '',
+  backgroundPhotoUrl: null,
   updatedAt: new Date(0).toISOString(),
 };
 

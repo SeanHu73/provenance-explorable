@@ -18,6 +18,7 @@ import { saveStop, deleteStop } from '@/lib/explorable/stops-store';
 import { useAutoSave, autoSaveLabel, autoSaveColor } from '@/lib/explorable/use-auto-save';
 import PhotoUploader from './PhotoUploader';
 import AudioUploader from './AudioUploader';
+import SinglePhotoField from './SinglePhotoField';
 
 const PinPlacementMap = dynamic(() => import('./PinPlacementMap'), { ssr: false });
 
@@ -120,6 +121,17 @@ export default function StopForm({ initial, isNew }: Props) {
             </span>
           </label>
         </Field>
+      </Section>
+
+      {/* ── Background photo override ────────────────────────────── */}
+      <Section title="Background photo (optional)">
+        <SinglePhotoField
+          label="Per-stop background"
+          description="If set, this photo replaces the game-level background from this stop onward (matches Provenance's per-stop background override). Leave empty to use the game-level photo."
+          value={stop.backgroundPhotoOverride}
+          onChange={(url) => patch({ backgroundPhotoOverride: url })}
+          previewClassName="w-full max-w-md aspect-[4/3]"
+        />
       </Section>
 
       {/* ── Location ─────────────────────────────────────────────── */}
