@@ -10,7 +10,7 @@
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { LatLng } from './geo';
+import { LatLng, STANFORD_BOUNDS } from './geo';
 
 const COLLECTION = 'explorable-config';
 const DOC_ID = 'main';
@@ -27,6 +27,13 @@ export interface BuildingTrigger {
   radiusM: number;     // default ~20 m
 }
 
+export interface MapBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 export interface ExplorableConfig {
   /** The essential question players see at start of game, midway sort, and final sort. */
   essentialQuestion: string;
@@ -35,6 +42,8 @@ export interface ExplorableConfig {
   backgroundPhotoUrl: string | null;
   /** Hidden trigger zones that gate the "I'm inside" indoor toggle. */
   buildingTriggers: BuildingTrigger[];
+  /** Hard pan boundary for the player map. Defaults to Stanford. */
+  bounds: MapBounds;
   updatedAt: string;
 }
 
@@ -42,6 +51,7 @@ export const DEFAULT_CONFIG: ExplorableConfig = {
   essentialQuestion: '',
   backgroundPhotoUrl: null,
   buildingTriggers: [],
+  bounds: { ...STANFORD_BOUNDS },
   updatedAt: new Date(0).toISOString(),
 };
 

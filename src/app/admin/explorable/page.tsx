@@ -22,6 +22,7 @@ import {
 } from '@/lib/explorable/use-auto-save';
 import SinglePhotoField from '@/components/explorable/admin/SinglePhotoField';
 import BuildingTriggersEditor from '@/components/explorable/admin/BuildingTriggersEditor';
+import BoundsEditor from '@/components/explorable/admin/BoundsEditor';
 
 const ContextualisationExplainer = dynamic(
   () => import('@/components/explorable/ContextualisationExplainer'),
@@ -232,6 +233,25 @@ function EssentialQuestionEditor() {
               setConfig({ ...config, backgroundPhotoUrl: url })
             }
             previewClassName="w-full max-w-md aspect-[4/3]"
+          />
+        )}
+      </section>
+
+      <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
+        <div className="flex items-baseline justify-between mb-1 gap-3">
+          <h2 className="font-semibold text-lg">Map Bounds</h2>
+          {saveIndicator}
+        </div>
+        <p className="text-xs text-stone-600 mb-3">
+          The player can't pan outside this rectangle. Defaults to the
+          Stanford campus core.
+        </p>
+        {loading ? (
+          <p className="text-sm text-stone-500">Loading…</p>
+        ) : (
+          <BoundsEditor
+            value={config.bounds}
+            onChange={(bounds) => setConfig({ ...config, bounds })}
           />
         )}
       </section>

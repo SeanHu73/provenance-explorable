@@ -16,7 +16,7 @@
  * config-store entry can override them.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LatLng, PlayerPosition, distanceM } from './geo';
 import { ExplorableStop } from './stop-types';
 import { BuildingTrigger } from './config-store';
@@ -106,37 +106,10 @@ export function isInAnyTrigger(
   return false;
 }
 
-// ───── localStorage for collected / indoor state ─────────────────
-
-const COLLECTED_KEY = 'provenance-explorable-collected';
-const INDOOR_KEY = 'provenance-explorable-indoor';
-
-function readCollected(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(COLLECTED_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCollected(ids: string[]) {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(COLLECTED_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
-}
-
-function readIndoor(): boolean {
-  if (typeof window === 'undefined') return false;
-  try { return window.localStorage.getItem(INDOOR_KEY) === 'true'; } catch { return false; }
-}
-
-function writeIndoor(value: boolean) {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(INDOOR_KEY, String(value)); } catch { /* ignore */ }
-}
+// ───── In-memory progress (resets on refresh) ──────────────────
+// Earlier this persisted to localStorage; switched to in-memory by
+// request so every page load is a fresh session. Reintroduce
+// persistence here if multi-session play comes back.
 
 export interface ProgressState {
   collectedIds: Set<string>;
@@ -148,11 +121,8 @@ export interface ProgressState {
 }
 
 export function useProgress(): ProgressState {
-  const [collected, setCollected] = useState<string[]>(() => readCollected());
-  const [indoor, setIndoor] = useState<boolean>(() => readIndoor());
-
-  useEffect(() => { writeCollected(collected); }, [collected]);
-  useEffect(() => { writeIndoor(indoor); }, [indoor]);
+  const [collected, setCollected] = useState<string[]>([]);
+  const [indoor, setIndoor] = useState<boolean>(false);
 
   const collectedSet = useMemo(() => new Set(collected), [collected]);
 

@@ -36,12 +36,17 @@ import {
   useProgress,
   StopDiscovery,
 } from '@/lib/explorable/discovery';
-import { getConfig, BuildingTrigger } from '@/lib/explorable/config-store';
+import {
+  getConfig,
+  BuildingTrigger,
+  MapBounds,
+} from '@/lib/explorable/config-store';
 import { useEffect } from 'react';
 import DevLocationOverlay from './DevLocationOverlay';
 import WarmHalo from './WarmHalo';
 import StopPinMarker, { PinVariant } from './StopPinMarker';
 import StopCard from './StopCard';
+import JournalSheet from './JournalSheet';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
@@ -51,13 +56,16 @@ export default function ExplorableMap() {
   const { stops } = useStops();
   const progress = useProgress();
   const [activeStopId, setActiveStopId] = useState<string | null>(null);
+  const [journalOpen, setJournalOpen] = useState(false);
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
+  const [bounds, setBounds] = useState<MapBounds>(STANFORD_BOUNDS);
 
   useEffect(() => {
     getConfig().then((c) => {
       setBgPhoto(c.backgroundPhotoUrl);
       setTriggers(c.buildingTriggers || []);
+      if (c.bounds) setBounds(c.bounds);
     });
   }, []);
 
@@ -123,7 +131,7 @@ export default function ExplorableMap() {
         <GoogleMap
           mapId={MAP_ID}
           defaultCenter={STANFORD_CENTER}
-          defaultZoom={18}
+          defaultZoom={19}
           minZoom={16}
           maxZoom={20}
           mapTypeId="hybrid"
@@ -132,10 +140,10 @@ export default function ExplorableMap() {
           clickableIcons={false}
           restriction={{
             latLngBounds: {
-              north: STANFORD_BOUNDS.north,
-              south: STANFORD_BOUNDS.south,
-              east:  STANFORD_BOUNDS.east,
-              west:  STANFORD_BOUNDS.west,
+              north: bounds.north,
+              south: bounds.south,
+              east:  bounds.east,
+              west:  bounds.west,
             },
             strictBounds: true,
           }}
@@ -191,6 +199,32 @@ export default function ExplorableMap() {
         error={loc.error}
         onToggle={loc.setDevEnabled}
         onClear={() => loc.setDevPosition(null)}
+      />
+
+      {/* Journal button — bottom-left */}
+      <button
+        type="button"
+        onClick={() => setJournalOpen(true)}
+        className="absolute bottom-5 left-4 z-30 px-4 py-2.5 rounded-full bg-white/95 hover:bg-white text-stone-900 text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2"
+        style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
+      >
+        Journal
+        {progress.collectedIds.size > 0 && (
+          <span
+            className="inline-flex items-center justify-center min-w-[1.4rem] h-5 px-1.5 rounded-full text-white text-[11px] font-bold"
+            style={{ background: 'var(--th-primary, #8b2538)' }}
+          >
+            {progress.collectedIds.size}
+          </span>
+        )}
+      </button>
+
+      <JournalSheet
+        open={journalOpen}
+        stops={stops}
+        collectedIds={progress.collectedIds}
+        onClose={() => setJournalOpen(false)}
+        onOpenStop={(id) => setActiveStopId(id)}
       />
 
       {/* Active stop modal */}
