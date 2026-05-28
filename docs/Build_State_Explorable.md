@@ -4,6 +4,14 @@
 Last updated 2026-05-28.
 Read this instead of re-discovering the codebase.*
 
+> **2026-05-28 — Intro screen + journal EQ banner.**
+> `/explorable` now opens on a cloudy intro that displays the essential
+> question; learners scroll (or tap the down arrow) to reveal the map
+> below. The shared `SplashScreen` overlay (Provenance pin-drop) is
+> suppressed on this route so the intro reads as the entry point. The
+> `JournalSheet` shows the EQ as a pinned banner at the top so learners
+> can re-anchor on it any time.
+
 ---
 
 ## 0. Project Context
@@ -59,7 +67,7 @@ State held:
 
 | URL | Purpose |
 |---|---|
-| `/explorable` | The game. Bounded Stanford map, live GPS, player marker, journal, lesson, sorts, reveal. |
+| `/explorable` | The game. Two snap-aligned screens stacked vertically — `ExplorableIntro` (cloudy EQ opener) at the top, then `ExplorableMap` (bounded Stanford map, live GPS, player marker, journal, lesson, sorts, reveal) below. Learners scroll down to reach the map. |
 | `/explorable?devloc=1` | Same, but forces the dev location override panel and the bottom-right dev menu to appear regardless of environment. |
 | `/admin/explorable` | Game-level authoring: essential question, background photo, map bounds, indoor triggers, contextualisation explainer screens, lesson preview. |
 | `/admin/explorable/stops` | Stop list. Add / open / delete stops. |
@@ -110,6 +118,9 @@ State held:
 ```
 [Page loads at /explorable]
   ↓
+Cloudy intro screen. Essential question fades in over drifting clouds.
+"Scroll down to your map" cue at the bottom.
+  ↓ (scroll / tap arrow)
 Bounded Stanford Hybrid map. Live GPS player marker (blue) or fake-GPS (orange).
   ↓
 Player walks toward a stop.
@@ -173,7 +184,7 @@ End of reveal → "Done" → close
 
 ### Manual controls
 
-- **Journal** button (bottom-centre) — sheet listing every collected piece. Tap a piece to re-open its StopCard. Top of the sheet has **Finish the tour** button → opens FinalSort directly.
+- **Journal** button (bottom-centre) — sheet listing every collected piece. The essential question is pinned at the top of the sheet (themed red banner) so learners can refer back to it. Tap a piece to re-open its StopCard. Below the EQ banner the sheet has **Finish the tour** button → opens FinalSort directly.
 - **Dev** button (bottom-right, small, dev-mode only) — expands to four shortcuts: Lesson preview, Midway sort, Final sort, Reveal. Falls back to all authored stops if collected is empty so the screens are demonstrable from a clean session.
 - **Dev location panel** (top-right, dev-mode only) — toggle Fake GPS, tap map to set position.
 

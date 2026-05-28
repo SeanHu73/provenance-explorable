@@ -51,7 +51,32 @@
       "Bash(node -e ' *)",
       "Bash(echo \"EXIT=$?\")",
       "Bash(echo \"TSC_EXIT=$?\")",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(curl -s -o /tmp/explorable.html -w \"explorable_status=%{http_code}\\\\n\" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/admin_exp.html -w \"admin_explorable_status=%{http_code}\\\\n\" http://localhost:3000/admin/explorable)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /tmp/exp2.html -w \"status=%{http_code}\\\\n\" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/exp3.html -w \"explorable=%{http_code} \" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/adm.html -w \"admin=%{http_code}\\\\n\" http://localhost:3000/admin/explorable)",
+      "Bash(curl -s -o /tmp/exp.html -w \"explorable=%{http_code}\\\\n\" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /dev/null -w \"root_status=%{http_code}\\\\n\" --max-time 3 http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"explorable_status=%{http_code}\\\\n\" --max-time 3 http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/list.html -w \"list=%{http_code} \" http://localhost:3000/admin/explorable/stops)",
+      "Bash(curl -s -o /tmp/new.html -w \"new=%{http_code} \" http://localhost:3000/admin/explorable/stops/new)",
+      "Bash(curl -s -o /tmp/exp.html -w \"explorable=%{http_code} \" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/root.html -w \"root=%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /tmp/a.html -w \"admin=%{http_code} \" http://localhost:3000/admin/explorable)",
+      "Bash(curl -s -o /tmp/n.html -w \"new=%{http_code} \" http://localhost:3000/admin/explorable/stops/new)",
+      "Bash(curl -s -o /tmp/e.html -w \"explorable=%{http_code}\\\\n\" http://localhost:3000/explorable)",
+      "Bash(curl -s -o /tmp/l.html -w \"list=%{http_code}\\\\n\" http://localhost:3000/admin/explorable/stops)",
+      "Bash(curl -s -o /tmp/a.html -w \"admin=%{http_code}\\\\n\" http://localhost:3000/admin/explorable)",
+      "Bash(curl -s -o /tmp/u.html -w \"upload_route_GET=%{http_code}\\\\n\" http://localhost:3000/api/explorable/upload)",
+      "Bash(curl -s -o /tmp/n.html -w \"new=%{http_code}\\\\n\" http://localhost:3000/admin/explorable/stops/new)",
+      "Bash(npm install *)",
+      "Bash(curl -s -o /tmp/o.html -w \"overview=%{http_code} \" http://localhost:3000/admin/explorable/overview)",
+      "Bash(curl -s https://provenance-explorable.vercel.app/explorable)",
+      "Bash(curl *)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }

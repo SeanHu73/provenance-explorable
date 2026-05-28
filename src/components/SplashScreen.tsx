@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 const STORAGE_KEY = 'splash_seen';
 
@@ -22,8 +23,13 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 
 export default function SplashScreen({ children }: { children: React.ReactNode }) {
   const [phase, setPhase] = useState<Phase>('hidden');
+  const pathname = usePathname();
+  // The explorable route owns its own intro (cloudy EQ screen), so the
+  // Provenance pin-drop splash is suppressed there even on a first visit.
+  const skip = pathname?.startsWith('/explorable') ?? false;
 
   useIsoLayoutEffect(() => {
+    if (skip) return;
     if (sessionStorage.getItem(STORAGE_KEY)) return;
     sessionStorage.setItem(STORAGE_KEY, '1');
     setPhase('animating');
@@ -36,7 +42,7 @@ export default function SplashScreen({ children }: { children: React.ReactNode }
       window.clearTimeout(fadeAt);
       window.clearTimeout(doneAt);
     };
-  }, []);
+  }, [skip]);
 
   return (
     <>

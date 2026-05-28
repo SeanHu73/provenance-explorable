@@ -454,6 +454,7 @@ export default function ExplorableMap() {
         open={journalOpen}
         stops={stops}
         collectedIds={progress.collectedIds}
+        essentialQuestion={eq}
         onClose={() => setJournalOpen(false)}
         onOpenStop={(id) => setActiveStopId(id)}
         onFinishTour={() => {

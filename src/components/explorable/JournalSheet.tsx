@@ -19,6 +19,8 @@ interface Props {
   onOpenStop: (stopId: string) => void;
   /** Shows a "Finish tour" button when there's anything to finalise. */
   onFinishTour?: () => void;
+  /** Pinned at the top of the sheet so learners can re-anchor on it. */
+  essentialQuestion?: string;
 }
 
 export default function JournalSheet({
@@ -28,6 +30,7 @@ export default function JournalSheet({
   onClose,
   onOpenStop,
   onFinishTour,
+  essentialQuestion,
 }: Props) {
   const collected = stops.filter((s) => collectedIds.has(s.id));
 
@@ -49,9 +52,28 @@ export default function JournalSheet({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 280, damping: 32 }}
-            className="fixed left-0 right-0 bottom-0 z-50 max-h-[80vh] rounded-t-3xl bg-white shadow-2xl flex flex-col"
+            className="fixed left-0 right-0 bottom-0 z-50 max-h-[85vh] rounded-t-3xl bg-white shadow-2xl flex flex-col overflow-hidden"
             style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
           >
+            {essentialQuestion && (
+              <div
+                className="px-5 pt-5 pb-4 text-white"
+                style={{ background: 'var(--th-question-bg-solid, #6E1F2E)' }}
+              >
+                <div className="text-[10px] uppercase tracking-[0.28em] opacity-75">
+                  Essential question
+                </div>
+                <p
+                  className="mt-1.5 text-[15px] leading-snug"
+                  style={{
+                    fontFamily: 'var(--font-dm-serif-display), Georgia, serif',
+                  }}
+                >
+                  {essentialQuestion}
+                </p>
+              </div>
+            )}
+
             <header className="px-5 pt-4 pb-3 border-b border-stone-200 flex items-center justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.25em] text-stone-500">
