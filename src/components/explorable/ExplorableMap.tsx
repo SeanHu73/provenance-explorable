@@ -1,19 +1,21 @@
 'use client';
 
 /**
- * The bounded Stanford map for the explorable.
+ * Bounded Stanford map for the explorable.
  *
- * - Hybrid Google Maps tiles (satellite + labels) restricted to the
- *   Stanford campus core. minZoom 16 prevents zooming out to see the
- *   surrounding city.
- * - Player marker shows current position (real GPS or dev override).
- * - When the dev override is enabled, clicking the map sets the player's
- *   fake position.
- *
- * Stops, pin discovery, detection radii, etc. come in a follow-up.
+ *  - Hybrid Google Maps tiles, locked to the campus bounding box.
+ *  - Real GPS (or dev override) drives the player marker.
+ *  - Stops loaded from Firestore; each one's discovery status is
+ *    recomputed every render against the live player position:
+ *      ≤ 5 m  → pin shown + tappable
+ *      ≤ 10 m → screen-edge yellow halo (WarmHalo overlay)
+ *  - Indoor-flagged stops bypass GPS; a manual "I'm inside" toggle
+ *    reveals them all (and indoor revelation persists in localStorage).
+ *  - Tapping a discovered pin opens StopCard (notice → context →
+ *    collected). Completion marks the stop in localStorage.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   APIProvider,
   Map as GoogleMap,
@@ -26,18 +28,67 @@ import {
   STANFORD_CENTER,
 } from '@/lib/explorable/geo';
 import { useLocationSource } from '@/lib/explorable/location-source';
+import { useStops } from '@/lib/explorable/use-stops';
+import {
+  computeDiscoveries,
+  closestWarmDistance,
+  useProgress,
+  StopDiscovery,
+} from '@/lib/explorable/discovery';
+import { getConfig } from '@/lib/explorable/config-store';
+import { useEffect } from 'react';
 import DevLocationOverlay from './DevLocationOverlay';
+import WarmHalo from './WarmHalo';
+import StopPinMarker, { PinVariant } from './StopPinMarker';
+import StopCard from './StopCard';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
-// Reuses the existing Provenance Cloud Map style ID.
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
 
 export default function ExplorableMap() {
   const loc = useLocationSource();
+  const { stops } = useStops();
+  const progress = useProgress();
+  const [activeStopId, setActiveStopId] = useState<string | null>(null);
+  const [bgPhoto, setBgPhoto] = useState<string | null>(null);
 
-  // While dev mode is enabled, clicking the map repositions the fake
-  // player. When dev mode is off, clicks do nothing (we'll later use
-  // clicks on pins themselves).
+  useEffect(() => {
+    getConfig().then((c) => setBgPhoto(c.backgroundPhotoUrl));
+  }, []);
+
+  const discoveries = useMemo(
+    () =>
+      computeDiscoveries({
+        stops,
+        player: loc.position,
+        collectedIds: progress.collectedIds,
+        indoorRevealed: progress.indoorRevealed,
+      }),
+    [stops, loc.position, progress.collectedIds, progress.indoorRevealed],
+  );
+
+  const warmM = useMemo(() => closestWarmDistance(discoveries), [discoveries]);
+  const visible = useMemo(
+    () =>
+      discoveries.filter(
+        (d) =>
+          d.status === 'discovered' ||
+          d.status === 'collected' ||
+          d.status === 'indoorReady',
+      ),
+    [discoveries],
+  );
+
+  const hasIndoorStops = useMemo(
+    () => stops.some((s) => s.isIndoor),
+    [stops],
+  );
+
+  const activeStop = useMemo(
+    () => stops.find((s) => s.id === activeStopId) || null,
+    [stops, activeStopId],
+  );
+
   const handleMapClick = useCallback(
     (e: MapMouseEvent) => {
       if (!loc.devEnabled) return;
@@ -89,9 +140,38 @@ export default function ExplorableMap() {
               <PlayerDot source={loc.position.source} />
             </AdvancedMarker>
           )}
+
+          {visible.map((d) => (
+            <AdvancedMarker
+              key={d.stop.id}
+              position={d.stop.location}
+              anchorPoint={AdvancedMarkerAnchorPoint.BOTTOM}
+              clickable
+              onClick={() => setActiveStopId(d.stop.id)}
+            >
+              <StopPinMarker variant={pinVariantFor(d)} />
+            </AdvancedMarker>
+          ))}
         </GoogleMap>
       </APIProvider>
 
+      {/* Warm proximity halo */}
+      <WarmHalo closestWarmM={warmM} />
+
+      {/* Indoor toggle */}
+      {hasIndoorStops && (
+        <button
+          type="button"
+          onClick={() => progress.setIndoorRevealed(!progress.indoorRevealed)}
+          className="absolute top-3 left-3 z-30 px-3 py-2 rounded-full bg-white/90 hover:bg-white text-stone-900 text-xs font-medium shadow-md backdrop-blur-sm"
+        >
+          {progress.indoorRevealed
+            ? '✓ I\'m inside Memorial Church'
+            : 'I\'m inside Memorial Church'}
+        </button>
+      )}
+
+      {/* Dev panel */}
       <DevLocationOverlay
         devEnabled={loc.devEnabled}
         devPosition={loc.devPosition}
@@ -100,8 +180,24 @@ export default function ExplorableMap() {
         onToggle={loc.setDevEnabled}
         onClear={() => loc.setDevPosition(null)}
       />
+
+      {/* Active stop modal */}
+      {activeStop && (
+        <StopCard
+          stop={activeStop}
+          backgroundPhotoUrl={bgPhoto}
+          onComplete={() => progress.collect(activeStop.id)}
+          onClose={() => setActiveStopId(null)}
+        />
+      )}
     </div>
   );
+}
+
+function pinVariantFor(d: StopDiscovery): PinVariant {
+  if (d.status === 'collected') return 'collected';
+  if (d.status === 'indoorReady') return 'indoor';
+  return 'discovered';
 }
 
 function PlayerDot({ source }: { source: 'gps' | 'dev' }) {
