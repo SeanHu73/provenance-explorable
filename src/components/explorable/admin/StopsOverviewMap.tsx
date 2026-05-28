@@ -130,34 +130,19 @@ function NumberedPin({
   indoor: boolean;
 }) {
   const colour = indoor ? '#3b82f6' : '#e53935';
+  // Names hidden on the map by request — the legend in the corner is
+  // the only place the title is visible. The number on the pin head
+  // maps each one to the legend list.
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 2,
         pointerEvents: 'none',
       }}
       title={title}
     >
-      <span
-        style={{
-          background: 'rgba(20,16,12,0.85)',
-          color: 'white',
-          fontSize: 11,
-          fontFamily: 'system-ui, sans-serif',
-          fontWeight: 600,
-          padding: '2px 6px',
-          borderRadius: 6,
-          whiteSpace: 'nowrap',
-          maxWidth: 180,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {index}. {title}
-      </span>
       <svg width={32} height={42} viewBox="0 0 24 32">
         <rect x={8}  y={2}  width={8}  height={2} fill={colour} />
         <rect x={6}  y={4}  width={12} height={2} fill={colour} />
