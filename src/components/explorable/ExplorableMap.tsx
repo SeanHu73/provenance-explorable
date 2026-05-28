@@ -32,10 +32,11 @@ import { useStops } from '@/lib/explorable/use-stops';
 import {
   computeDiscoveries,
   closestWarmDistance,
+  isInAnyTrigger,
   useProgress,
   StopDiscovery,
 } from '@/lib/explorable/discovery';
-import { getConfig } from '@/lib/explorable/config-store';
+import { getConfig, BuildingTrigger } from '@/lib/explorable/config-store';
 import { useEffect } from 'react';
 import DevLocationOverlay from './DevLocationOverlay';
 import WarmHalo from './WarmHalo';
@@ -51,10 +52,19 @@ export default function ExplorableMap() {
   const progress = useProgress();
   const [activeStopId, setActiveStopId] = useState<string | null>(null);
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
+  const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
 
   useEffect(() => {
-    getConfig().then((c) => setBgPhoto(c.backgroundPhotoUrl));
+    getConfig().then((c) => {
+      setBgPhoto(c.backgroundPhotoUrl);
+      setTriggers(c.buildingTriggers || []);
+    });
   }, []);
+
+  const playerInTrigger = useMemo(
+    () => isInAnyTrigger(loc.position, triggers),
+    [loc.position, triggers],
+  );
 
   const discoveries = useMemo(
     () =>
@@ -158,8 +168,10 @@ export default function ExplorableMap() {
       {/* Warm proximity halo */}
       <WarmHalo closestWarmM={warmM} />
 
-      {/* Indoor toggle */}
-      {hasIndoorStops && (
+      {/* Indoor toggle — only when the player has crossed into a
+          building trigger zone (or has already revealed the indoors,
+          so they can toggle it back off without leaving the building) */}
+      {hasIndoorStops && (playerInTrigger || progress.indoorRevealed) && (
         <button
           type="button"
           onClick={() => progress.setIndoorRevealed(!progress.indoorRevealed)}

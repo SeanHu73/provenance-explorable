@@ -14,6 +14,9 @@ interface Props {
   variant: PinVariant;
 }
 
+const BASE_W = 44;
+const BASE_H = 56;
+
 export default function StopPinMarker({ variant }: Props) {
   const colour =
     variant === 'collected' ? '#9ca3af'
@@ -27,8 +30,8 @@ export default function StopPinMarker({ variant }: Props) {
     <div
       style={{
         position: 'relative',
-        width: 28 * scale,
-        height: 36 * scale,
+        width: BASE_W * scale,
+        height: BASE_H * scale,
       }}
       aria-label={`Stop pin — ${variant}`}
     >
@@ -38,8 +41,8 @@ export default function StopPinMarker({ variant }: Props) {
             position: 'absolute',
             inset: '50% 50% auto auto',
             transform: 'translate(50%, -50%)',
-            width: 36,
-            height: 36,
+            width: BASE_W * 1.2,
+            height: BASE_W * 1.2,
             borderRadius: '50%',
             background: colour,
             opacity: 0.4,
@@ -49,8 +52,8 @@ export default function StopPinMarker({ variant }: Props) {
       )}
       <svg
         viewBox="0 0 24 32"
-        width={28 * scale}
-        height={36 * scale}
+        width={BASE_W * scale}
+        height={BASE_H * scale}
         style={{
           position: 'relative',
           display: 'block',

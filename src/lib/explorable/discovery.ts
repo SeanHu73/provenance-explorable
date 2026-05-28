@@ -19,9 +19,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LatLng, PlayerPosition, distanceM } from './geo';
 import { ExplorableStop } from './stop-types';
+import { BuildingTrigger } from './config-store';
 
-export const DISCOVERY_RADIUS_M = 5;
-export const WARM_RADIUS_M = 10;
+export const DISCOVERY_RADIUS_M = 15;
+export const WARM_RADIUS_M = 30;
 
 export type StopStatus =
   | 'far'
@@ -87,6 +88,22 @@ export function closestWarmDistance(discoveries: StopDiscovery[]): number | null
     if (best === null || d.distanceM < best) best = d.distanceM;
   }
   return best;
+}
+
+/**
+ * True if the player is currently within the radius of any building
+ * trigger. Used to gate the "I'm inside <building>" indoor toggle —
+ * we don't show it until the player has crossed into a trigger zone.
+ */
+export function isInAnyTrigger(
+  player: PlayerPosition | null,
+  triggers: BuildingTrigger[],
+): boolean {
+  if (!player || triggers.length === 0) return false;
+  for (const t of triggers) {
+    if (distanceM(player as LatLng, t.location) <= t.radiusM) return true;
+  }
+  return false;
 }
 
 // ───── localStorage for collected / indoor state ─────────────────
