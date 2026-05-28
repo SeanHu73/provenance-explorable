@@ -1,33 +1,53 @@
 /**
- * Firebase Storage upload helpers for the explorable.
+ * Client-side upload helpers for the explorable.
  *
- * Photos go to /explorable/photo/<ts>_<name>; audio to /explorable/audio/<ts>_<name>.
- * Returns the download URL the app can use directly (signed permanently
- * by Firebase's media token).
+ * Uploads go to /api/explorable/upload, which forwards them to Firebase
+ * Storage server-side. This sidesteps the CORS preflight that
+ * direct-from-browser Firebase Storage uploads require — convenient
+ * because we never had to run gsutil to configure the bucket.
+ *
+ * Same call signature as before so the form components don't change.
  */
-
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
 
 export type UploadKind = 'photo' | 'audio';
 
-const ACCEPT: Record<UploadKind, string> = {
-  photo: 'image/*',
-  audio: 'audio/*',
-};
+export const ACCEPT_PHOTO = 'image/*';
+export const ACCEPT_AUDIO = 'audio/*';
 
-export const ACCEPT_PHOTO = ACCEPT.photo;
-export const ACCEPT_AUDIO = ACCEPT.audio;
+interface UploadResponse {
+  url?: string;
+  path?: string;
+  error?: string;
+  details?: string;
+}
 
-/**
- * Uploads a file to Firebase Storage and returns its download URL.
- * The path includes a timestamp + safe-name so collisions are vanishingly
- * unlikely without needing to round-trip the storage layer.
- */
 export async function uploadFile(file: File, kind: UploadKind): Promise<string> {
-  const safeName = file.name.replace(/[^a-z0-9.\-_]/gi, '_');
-  const path = `explorable/${kind}/${Date.now()}_${safeName}`;
-  const r = ref(storage, path);
-  await uploadBytes(r, file);
-  return getDownloadURL(r);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('kind', kind);
+
+  let res: Response;
+  try {
+    res = await fetch('/api/explorable/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (err) {
+    throw new Error(
+      `Network error reaching /api/explorable/upload: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  const data: UploadResponse = await res.json().catch(() => ({}));
+
+  if (!res.ok || !data.url) {
+    const detail = data.details ? ` — ${data.details}` : '';
+    throw new Error(
+      `Upload failed (${res.status}): ${data.error || 'unknown error'}${detail}`,
+    );
+  }
+
+  return data.url;
 }
