@@ -47,6 +47,7 @@ import WarmHalo from './WarmHalo';
 import StopPinMarker, { PinVariant } from './StopPinMarker';
 import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
+import IndoorPromptOverlay from './IndoorPromptOverlay';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
@@ -176,20 +177,14 @@ export default function ExplorableMap() {
       {/* Warm proximity halo */}
       <WarmHalo closestWarmM={warmM} />
 
-      {/* Indoor toggle — only when the player has crossed into a
-          building trigger zone (or has already revealed the indoors,
-          so they can toggle it back off without leaving the building) */}
-      {hasIndoorStops && (playerInTrigger || progress.indoorRevealed) && (
-        <button
-          type="button"
-          onClick={() => progress.setIndoorRevealed(!progress.indoorRevealed)}
-          className="absolute top-3 left-3 z-30 px-3 py-2 rounded-full bg-white/90 hover:bg-white text-stone-900 text-xs font-medium shadow-md backdrop-blur-sm"
-        >
-          {progress.indoorRevealed
-            ? '✓ I\'m inside Memorial Church'
-            : 'I\'m inside Memorial Church'}
-        </button>
-      )}
+      {/* One-shot indoor prompt — fires the first time the player
+          crosses into any building trigger zone (and we have indoor
+          stops authored). Once confirmed, indoorRevealed flips true
+          and the prompt is gone for the rest of the session. */}
+      <IndoorPromptOverlay
+        open={hasIndoorStops && playerInTrigger && !progress.indoorRevealed}
+        onConfirm={() => progress.setIndoorRevealed(true)}
+      />
 
       {/* Dev panel */}
       <DevLocationOverlay
@@ -201,17 +196,17 @@ export default function ExplorableMap() {
         onClear={() => loc.setDevPosition(null)}
       />
 
-      {/* Journal button — bottom-left */}
+      {/* Journal button — bottom-left, sized for thumbs */}
       <button
         type="button"
         onClick={() => setJournalOpen(true)}
-        className="absolute bottom-5 left-4 z-30 px-4 py-2.5 rounded-full bg-white/95 hover:bg-white text-stone-900 text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2"
+        className="absolute bottom-5 left-4 z-30 px-6 py-3.5 rounded-full bg-white/95 hover:bg-white text-stone-900 text-base font-semibold shadow-lg backdrop-blur-sm flex items-center gap-2"
         style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
       >
         Journal
         {progress.collectedIds.size > 0 && (
           <span
-            className="inline-flex items-center justify-center min-w-[1.4rem] h-5 px-1.5 rounded-full text-white text-[11px] font-bold"
+            className="inline-flex items-center justify-center min-w-[1.6rem] h-6 px-2 rounded-full text-white text-xs font-bold"
             style={{ background: 'var(--th-primary, #8b2538)' }}
           >
             {progress.collectedIds.size}

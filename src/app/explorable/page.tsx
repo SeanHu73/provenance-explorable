@@ -32,7 +32,7 @@ export default function ExplorablePage() {
       <button
         type="button"
         onClick={() => setShowExplainer(true)}
-        className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-5 py-3 rounded-full bg-indigo-700 text-white shadow-lg hover:bg-indigo-800 font-medium text-sm whitespace-nowrap"
+        className="absolute bottom-5 right-4 z-30 px-6 py-3.5 rounded-full bg-indigo-700 text-white shadow-lg hover:bg-indigo-800 font-semibold text-base whitespace-nowrap"
       >
         Contextualisation lesson
       </button>

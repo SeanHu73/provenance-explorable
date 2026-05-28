@@ -18,13 +18,14 @@ const BASE_W = 44;
 const BASE_H = 56;
 
 export default function StopPinMarker({ variant }: Props) {
+  // discovered + indoor (after reveal) read as "go here" → red.
+  // collected reads as "you've been here" → blue.
   const colour =
-    variant === 'collected' ? '#9ca3af'
-    : variant === 'indoor'  ? '#3b82f6'
+    variant === 'collected' ? '#3b82f6'
     :                          '#e53935';
 
-  const scale = variant === 'collected' ? 0.8 : 1;
-  const pulse = variant === 'discovered';
+  const scale = variant === 'collected' ? 0.85 : 1;
+  const pulse = variant === 'discovered' || variant === 'indoor';
 
   return (
     <div
