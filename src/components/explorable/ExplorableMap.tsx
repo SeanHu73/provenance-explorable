@@ -309,19 +309,28 @@ export default function ExplorableMap() {
         )}
       </button>
 
-      {/* Dev-only lesson preview — subtle bottom-right menu so authors
-          can open the explainer without collecting 4 stops first. */}
+      {/* Dev-only shortcuts — stacked bottom-right so authors can
+          test each modal without going through the full game flow. */}
       {devMode && (
-        <button
-          type="button"
-          onClick={() => {
-            setExplainerPending(false);
-            setExplainerOpen(true);
-          }}
-          className="absolute bottom-5 right-4 z-30 px-3 py-2 rounded-lg bg-stone-900/75 hover:bg-stone-900/90 text-white text-xs font-medium backdrop-blur-sm shadow"
-        >
-          Dev · Lesson preview
-        </button>
+        <div className="absolute bottom-5 right-4 z-30 flex flex-col gap-1 items-end">
+          <DevShortcutBtn
+            onClick={() => {
+              setExplainerPending(false);
+              setExplainerOpen(true);
+            }}
+          >
+            Dev · Lesson preview
+          </DevShortcutBtn>
+          <DevShortcutBtn onClick={() => setMidwaySortOpen(true)}>
+            Dev · Midway sort
+          </DevShortcutBtn>
+          <DevShortcutBtn onClick={() => setFinalSortOpen(true)}>
+            Dev · Final sort
+          </DevShortcutBtn>
+          <DevShortcutBtn onClick={() => setRevealOpen(true)}>
+            Dev · Reveal
+          </DevShortcutBtn>
+        </div>
       )}
 
       {/* "Learn about contextualising" interstitial — appears only
@@ -363,17 +372,20 @@ export default function ExplorableMap() {
         }}
       />
 
-      {/* ── Midway sort — opens after the auto-fired explainer closes */}
+      {/* ── Midway sort — opens after the auto-fired explainer closes.
+          Falls back to ALL stops in dev so it's testable without
+          collecting four first. */}
       {midwaySortOpen && (
         <SortScreen
           title="Midway — sort your evidence"
           essentialQuestion={eq}
-          stops={midwayStops}
+          stops={midwayStops.length > 0 ? midwayStops : stops}
           backgroundPhotoUrl={bgPhoto}
           onComplete={(entries) => {
             progress.recordSort(entries);
             setMidwaySortOpen(false);
           }}
+          onCancel={devMode ? () => setMidwaySortOpen(false) : undefined}
         />
       )}
 
@@ -386,7 +398,15 @@ export default function ExplorableMap() {
               : 'Final review'
           }
           essentialQuestion={eq}
-          stops={finalSortStops}
+          stops={
+            finalSortStops.length > 0
+              ? finalSortStops
+              : stops.filter(
+                  (s) => !progress.sortedStopIds.has(s.id),
+                ).length > 0
+                ? stops.filter((s) => !progress.sortedStopIds.has(s.id))
+                : stops
+          }
           backgroundPhotoUrl={bgPhoto}
           onComplete={(entries) => {
             progress.recordSort(entries);
@@ -397,10 +417,12 @@ export default function ExplorableMap() {
         />
       )}
 
-      {/* ── Reveal sequence — runs after the final sort */}
+      {/* ── Reveal sequence — runs after the final sort. Dev shortcut
+          uses all stops so authors can see the disagreement UI even
+          without sorting anything. */}
       {revealOpen && (
         <RevealSequence
-          stops={allSortedStops}
+          stops={allSortedStops.length > 0 ? allSortedStops : stops}
           verdicts={progress.verdicts}
           backgroundPhotoUrl={bgPhoto}
           onRecordResponse={(stopId, response) =>
@@ -427,6 +449,24 @@ function pinVariantFor(d: StopDiscovery): PinVariant {
   if (d.status === 'collected') return 'collected';
   if (d.status === 'indoorReady') return 'indoor';
   return 'discovered';
+}
+
+function DevShortcutBtn({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="px-3 py-2 rounded-lg bg-stone-900/75 hover:bg-stone-900/90 text-white text-xs font-medium backdrop-blur-sm shadow whitespace-nowrap"
+    >
+      {children}
+    </button>
+  );
 }
 
 function PlayerDot({ source }: { source: 'gps' | 'dev' }) {
