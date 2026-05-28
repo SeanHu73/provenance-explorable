@@ -48,6 +48,14 @@ import StopPinMarker, { PinVariant } from './StopPinMarker';
 import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
 import IndoorPromptOverlay from './IndoorPromptOverlay';
+import dynamic from 'next/dynamic';
+
+const ContextualisationExplainer = dynamic(
+  () => import('./ContextualisationExplainer'),
+  { ssr: false },
+);
+
+const AUTO_EXPLAINER_THRESHOLD = 4;
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
@@ -58,6 +66,8 @@ export default function ExplorableMap() {
   const progress = useProgress();
   const [activeStopId, setActiveStopId] = useState<string | null>(null);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [explainerOpen, setExplainerOpen] = useState(false);
+  const [autoExplainerFired, setAutoExplainerFired] = useState(false);
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
   const [bounds, setBounds] = useState<MapBounds>(STANFORD_BOUNDS);
@@ -65,6 +75,18 @@ export default function ExplorableMap() {
   // indoor prompt stays open until they tap the button — even if they
   // wander out of the trigger again.
   const [indoorPromptShown, setIndoorPromptShown] = useState(false);
+  // Dev mode reveals an extra "Lesson preview" menu so authors can
+  // open the explainer without collecting 4 stops first.
+  const [devMode, setDevMode] = useState(false);
+
+  useEffect(() => {
+    const envFlag = process.env.NEXT_PUBLIC_ENABLE_DEV_LOC === 'true';
+    const isDev = process.env.NODE_ENV !== 'production';
+    const urlFlag =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('devloc');
+    setDevMode(envFlag || isDev || urlFlag);
+  }, []);
 
   useEffect(() => {
     getConfig().then((c) => {
@@ -92,6 +114,17 @@ export default function ExplorableMap() {
     // hasIndoorStops not in deps — it changes with stops above and
     // the latch only flips one direction, so missing it is harmless.
   }, [playerInTrigger, progress.indoorRevealed, indoorPromptShown]);
+
+  // Auto-fire the contextualisation explainer once the player has
+  // collected enough stops. One-shot per session — closing it doesn't
+  // re-trigger.
+  useEffect(() => {
+    if (autoExplainerFired) return;
+    if (progress.collectedIds.size >= AUTO_EXPLAINER_THRESHOLD) {
+      setAutoExplainerFired(true);
+      setExplainerOpen(true);
+    }
+  }, [progress.collectedIds.size, autoExplainerFired]);
 
   const discoveries = useMemo(
     () =>
@@ -215,11 +248,11 @@ export default function ExplorableMap() {
         onClear={() => loc.setDevPosition(null)}
       />
 
-      {/* Journal button — bottom-left, sized for thumbs */}
+      {/* Journal button — bottom-center, sized for thumbs */}
       <button
         type="button"
         onClick={() => setJournalOpen(true)}
-        className="absolute bottom-5 left-4 z-30 px-6 py-3.5 rounded-full bg-white/95 hover:bg-white text-stone-900 text-base font-semibold shadow-lg backdrop-blur-sm flex items-center gap-2"
+        className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-6 py-3.5 rounded-full bg-white/95 hover:bg-white text-stone-900 text-base font-semibold shadow-lg backdrop-blur-sm flex items-center gap-2 whitespace-nowrap"
         style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
       >
         Journal
@@ -232,6 +265,27 @@ export default function ExplorableMap() {
           </span>
         )}
       </button>
+
+      {/* Dev-only lesson preview — subtle bottom-right menu so authors
+          can open the explainer without collecting 4 stops first. */}
+      {devMode && (
+        <button
+          type="button"
+          onClick={() => setExplainerOpen(true)}
+          className="absolute bottom-5 right-4 z-30 px-3 py-2 rounded-lg bg-stone-900/75 hover:bg-stone-900/90 text-white text-xs font-medium backdrop-blur-sm shadow"
+        >
+          Dev · Lesson preview
+        </button>
+      )}
+
+      {/* Contextualisation explainer modal — auto-fires at
+          AUTO_EXPLAINER_THRESHOLD collected stops (one-shot), or
+          opened manually by the dev menu above. */}
+      {explainerOpen && (
+        <ContextualisationExplainer
+          onClose={() => setExplainerOpen(false)}
+        />
+      )}
 
       <JournalSheet
         open={journalOpen}
