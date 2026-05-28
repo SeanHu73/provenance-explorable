@@ -4,6 +4,12 @@
  * Read-only map showing every authored stop as a numbered pin. Used
  * on /admin/explorable/overview so the author can screenshot the
  * full set of locations at once.
+ *
+ * Differences from the player map:
+ *  - No pan restriction — author can roam freely
+ *  - No minZoom floor — they can zoom out to fit pins anywhere
+ *  - On load, the map auto-fits to the bounding box of every pin so
+ *    they don't have to manually find them
  */
 
 import { useEffect, useState } from 'react';
@@ -12,27 +18,20 @@ import {
   Map as GoogleMap,
   AdvancedMarker,
   AdvancedMarkerAnchorPoint,
+  useMap,
 } from '@vis.gl/react-google-maps';
-import {
-  STANFORD_BOUNDS,
-  STANFORD_CENTER,
-} from '@/lib/explorable/geo';
+import { STANFORD_CENTER } from '@/lib/explorable/geo';
 import { getStops } from '@/lib/explorable/stops-store';
 import { ExplorableStop } from '@/lib/explorable/stop-types';
-import { getConfig, MapBounds } from '@/lib/explorable/config-store';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
 
 export default function StopsOverviewMap() {
   const [stops, setStops] = useState<ExplorableStop[]>([]);
-  const [bounds, setBounds] = useState<MapBounds>(STANFORD_BOUNDS);
 
   useEffect(() => {
-    Promise.all([getStops(), getConfig()]).then(([s, c]) => {
-      setStops(s);
-      if (c.bounds) setBounds(c.bounds);
-    });
+    getStops().then(setStops);
   }, []);
 
   if (!API_KEY) {
@@ -50,18 +49,13 @@ export default function StopsOverviewMap() {
           mapId={MAP_ID}
           defaultCenter={STANFORD_CENTER}
           defaultZoom={18}
-          minZoom={15}
-          maxZoom={20}
           mapTypeId="hybrid"
           gestureHandling="greedy"
-          disableDefaultUI={true}
+          disableDefaultUI={false}
           clickableIcons={false}
-          restriction={{
-            latLngBounds: bounds,
-            strictBounds: true,
-          }}
           style={{ width: '100%', height: '100%' }}
         >
+          <FitToPins stops={stops} />
           {stops.map((s, i) => (
             <AdvancedMarker
               key={s.id}
@@ -103,6 +97,27 @@ export default function StopsOverviewMap() {
       </div>
     </div>
   );
+}
+
+/**
+ * Once the map is ready and we have stops, frame all of them. Runs
+ * only when the stop set changes — not on every pan/zoom — so the
+ * author can still re-zoom manually after the initial fit.
+ */
+function FitToPins({ stops }: { stops: ExplorableStop[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || stops.length === 0) return;
+    if (stops.length === 1) {
+      map.panTo(stops[0].location);
+      map.setZoom(18);
+      return;
+    }
+    const bounds = new google.maps.LatLngBounds();
+    for (const s of stops) bounds.extend(s.location);
+    map.fitBounds(bounds, 80);
+  }, [map, stops]);
+  return null;
 }
 
 function NumberedPin({
