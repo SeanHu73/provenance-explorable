@@ -1,4 +1,4 @@
-const CACHE_NAME = "memorial-church-v1";
+const CACHE_NAME = "memorial-church-v2";
 const PRECACHE_URLS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -22,18 +22,28 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Network-first; skip API calls
-  if (event.request.url.includes("/api/")) return;
+  // Only intercept same-origin GET requests. POST/PUT/DELETE (e.g.
+  // Firebase Storage uploads) and cross-origin requests (Google Maps
+  // tiles, Firebase, Deepgram) MUST pass through untouched — otherwise
+  // the catch-with-cache fallback returns `undefined` for a POST and
+  // throws "Failed to convert value to 'Response'".
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (event.request.method === "GET" && response.status === 200) {
+        if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        return cached || Response.error();
+      })
   );
 });
