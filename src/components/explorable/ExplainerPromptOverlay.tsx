@@ -1,26 +1,34 @@
 'use client';
 
 /**
- * Interstitial that sits between collecting a stop and the
- * Contextualisation Explainer auto-opening.
+ * Generic centred interstitial — used between collecting a stop and
+ * triggering a major game-flow action (lesson, final review, etc).
  *
- * Without it, the explainer pops up while the player is still on the
- * StopCard's Collected screen — disorienting. With it, we wait until
- * they return to the map, then surface a centred prompt giving them
- * agency to begin the lesson.
+ * Without it, big modals can pop up while the player is still on a
+ * StopCard Collected screen — disorienting. With it, we wait until
+ * they return to the map, then surface a small prompt giving them
+ * agency to proceed.
  *
- * Single primary action (no close button — the lesson is required at
- * this point in the flow).
+ * Single primary action (no close — the next phase is required).
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   open: boolean;
+  eyebrow?: string;
+  heading: string;
+  buttonLabel?: string;
   onBegin: () => void;
 }
 
-export default function ExplainerPromptOverlay({ open, onBegin }: Props) {
+export default function ExplainerPromptOverlay({
+  open,
+  eyebrow,
+  heading,
+  buttonLabel = 'Continue',
+  onBegin,
+}: Props) {
   return (
     <AnimatePresence>
       {open && (
@@ -45,9 +53,11 @@ export default function ExplainerPromptOverlay({ open, onBegin }: Props) {
             className="w-full max-w-sm rounded-3xl bg-white shadow-2xl px-7 py-9 text-center"
             style={{ fontFamily: 'var(--font-newsreader), Georgia, serif' }}
           >
-            <div className="text-xs uppercase tracking-[0.3em] text-stone-500 mb-3">
-              You've collected 4 pieces
-            </div>
+            {eyebrow && (
+              <div className="text-xs uppercase tracking-[0.3em] text-stone-500 mb-3">
+                {eyebrow}
+              </div>
+            )}
             <h2
               className="text-2xl sm:text-3xl font-semibold leading-tight mb-7"
               style={{
@@ -55,7 +65,7 @@ export default function ExplainerPromptOverlay({ open, onBegin }: Props) {
                 color: 'var(--th-primary, #8b2538)',
               }}
             >
-              Learn about contextualising
+              {heading}
             </h2>
             <button
               type="button"
@@ -63,7 +73,7 @@ export default function ExplainerPromptOverlay({ open, onBegin }: Props) {
               className="w-full px-6 py-4 rounded-2xl text-white text-lg font-semibold shadow-lg active:translate-y-px transition-transform"
               style={{ background: 'var(--th-primary, #8b2538)' }}
             >
-              Begin lesson
+              {buttonLabel}
             </button>
           </motion.div>
         </motion.div>

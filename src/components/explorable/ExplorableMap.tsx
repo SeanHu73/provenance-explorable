@@ -78,6 +78,11 @@ export default function ExplorableMap() {
   const [midwaySortOpen, setMidwaySortOpen] = useState(false);
   const [finalSortOpen, setFinalSortOpen] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
+  // Set true when the player has collected every authored stop; the
+  // "Review your evidence" interstitial then appears next time the
+  // map is clean.
+  const [finalPending, setFinalPending] = useState(false);
+  const [finalAutoFired, setFinalAutoFired] = useState(false);
   const [eq, setEq] = useState<string>('');
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
@@ -168,6 +173,18 @@ export default function ExplorableMap() {
       setExplainerPending(true);
     }
   }, [progress.collectedIds.size, autoExplainerFired]);
+
+  // Queue the final review once every authored stop has been collected.
+  // Same pattern as the lesson interstitial — wait for the map to be
+  // clean before showing the prompt.
+  useEffect(() => {
+    if (finalAutoFired) return;
+    if (stops.length === 0) return;
+    if (progress.collectedIds.size >= stops.length) {
+      setFinalAutoFired(true);
+      setFinalPending(true);
+    }
+  }, [progress.collectedIds.size, stops.length, finalAutoFired]);
 
   const discoveries = useMemo(
     () =>
@@ -345,9 +362,36 @@ export default function ExplorableMap() {
           !finalSortOpen &&
           !revealOpen
         }
+        eyebrow="You've collected 4 pieces"
+        heading="Learn about contextualising"
+        buttonLabel="Begin lesson"
         onBegin={() => {
           setExplainerPending(false);
           setExplainerOpen(true);
+        }}
+      />
+
+      {/* "Review your evidence" interstitial — fires once the player
+          has collected every authored stop. Same modal-guarding so
+          it never lands over an active StopCard or sort. The lesson
+          interstitial wins if both are pending at once. */}
+      <ExplainerPromptOverlay
+        open={
+          finalPending &&
+          !explainerPending &&
+          !activeStop &&
+          !journalOpen &&
+          !explainerOpen &&
+          !midwaySortOpen &&
+          !finalSortOpen &&
+          !revealOpen
+        }
+        eyebrow="You've collected everything"
+        heading="Review your evidence"
+        buttonLabel="Begin review"
+        onBegin={() => {
+          setFinalPending(false);
+          setFinalSortOpen(true);
         }}
       />
 
