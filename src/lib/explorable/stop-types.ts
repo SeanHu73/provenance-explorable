@@ -42,14 +42,6 @@ export interface ExplorableStop {
    */
   isIndoor: boolean;
 
-  /**
-   * Optional override of the game-level background photo. If null, the
-   * stop uses ExplorableConfig.backgroundPhotoUrl. If set, this photo
-   * replaces it for this stop onward (matches Provenance's
-   * Stop.backgroundPhotoOverride).
-   */
-  backgroundPhotoOverride: string | null;
-
   // Phase 1: Notice card — observation prompt + photos + optional audio.
   notice: {
     prompt: string;
@@ -100,7 +92,6 @@ export function blankStop(): ExplorableStop {
     // Default location: Memorial Church (matches the explorable's center).
     location: { lat: 37.4275, lng: -122.1697 },
     isIndoor: false,
-    backgroundPhotoOverride: null,
     notice: {
       prompt: '',
       timerSeconds: null,
