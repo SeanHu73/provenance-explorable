@@ -32,6 +32,7 @@ import { useStops } from '@/lib/explorable/use-stops';
 import {
   computeDiscoveries,
   closestWarmDistance,
+  closestDiscoveredDistance,
   isInAnyTrigger,
   useProgress,
   StopDiscovery,
@@ -200,6 +201,10 @@ export default function ExplorableMap() {
   );
 
   const warmM = useMemo(() => closestWarmDistance(discoveries), [discoveries]);
+  const discoveredM = useMemo(
+    () => closestDiscoveredDistance(discoveries),
+    [discoveries],
+  );
   const visible = useMemo(
     () =>
       discoveries.filter(
@@ -287,8 +292,8 @@ export default function ExplorableMap() {
         </GoogleMap>
       </APIProvider>
 
-      {/* Warm proximity halo */}
-      <WarmHalo closestWarmM={warmM} />
+      {/* Proximity halo — green when a pin is in sight, blue when warm */}
+      <WarmHalo closestDiscoveredM={discoveredM} closestWarmM={warmM} />
 
       {/* Indoor prompt — fires the first time the player crosses into
           any building trigger zone (and we have indoor stops authored).

@@ -91,6 +91,20 @@ export function closestWarmDistance(discoveries: StopDiscovery[]): number | null
 }
 
 /**
+ * Closest distance to any currently-discovered (tappable) stop. Used
+ * to drive the green "pin in sight" halo. Returns null if nothing is
+ * within the discovery radius.
+ */
+export function closestDiscoveredDistance(discoveries: StopDiscovery[]): number | null {
+  let best: number | null = null;
+  for (const d of discoveries) {
+    if (d.status !== 'discovered') continue;
+    if (best === null || d.distanceM < best) best = d.distanceM;
+  }
+  return best;
+}
+
+/**
  * True if the player is currently within the radius of any building
  * trigger. Used to gate the "I'm inside <building>" indoor toggle —
  * we don't show it until the player has crossed into a trigger zone.
