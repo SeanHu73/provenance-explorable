@@ -32,7 +32,7 @@ export default function PhotoUploader({ photos, onChange, label = 'Photos' }: Pr
       onChange([...photos, { url, caption: '' }]);
     } catch (err) {
       console.error('[PhotoUploader] upload failed', err);
-      setError('Upload failed. Check Firebase Storage rules and try again.');
+      setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setUploading(false);
     }

@@ -31,7 +31,7 @@ export default function AudioUploader({ audio, onChange, label = 'Audio' }: Prop
       onChange({ url, title: audio?.title || '' });
     } catch (err) {
       console.error('[AudioUploader] upload failed', err);
-      setError('Upload failed. Check Firebase Storage rules and try again.');
+      setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setUploading(false);
     }
