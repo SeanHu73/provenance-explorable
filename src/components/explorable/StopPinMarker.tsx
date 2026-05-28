@@ -58,10 +58,7 @@ export default function StopPinMarker({ variant }: Props) {
         style={{
           position: 'relative',
           display: 'block',
-          filter:
-            variant === 'collected'
-              ? 'opacity(0.7)'
-              : 'drop-shadow(0 2px 4px rgba(0,0,0,0.45))',
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.45))',
           imageRendering: 'pixelated',
         }}
       >

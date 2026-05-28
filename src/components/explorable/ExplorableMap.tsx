@@ -61,6 +61,10 @@ export default function ExplorableMap() {
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
   const [bounds, setBounds] = useState<MapBounds>(STANFORD_BOUNDS);
+  // Sticky flag: once the player has crossed into any trigger, the
+  // indoor prompt stays open until they tap the button — even if they
+  // wander out of the trigger again.
+  const [indoorPromptShown, setIndoorPromptShown] = useState(false);
 
   useEffect(() => {
     getConfig().then((c) => {
@@ -74,6 +78,20 @@ export default function ExplorableMap() {
     () => isInAnyTrigger(loc.position, triggers),
     [loc.position, triggers],
   );
+
+  // Latch the prompt on the first crossing — never auto-close.
+  useEffect(() => {
+    if (
+      hasIndoorStops &&
+      playerInTrigger &&
+      !progress.indoorRevealed &&
+      !indoorPromptShown
+    ) {
+      setIndoorPromptShown(true);
+    }
+    // hasIndoorStops not in deps — it changes with stops above and
+    // the latch only flips one direction, so missing it is harmless.
+  }, [playerInTrigger, progress.indoorRevealed, indoorPromptShown]);
 
   const discoveries = useMemo(
     () =>
@@ -177,12 +195,13 @@ export default function ExplorableMap() {
       {/* Warm proximity halo */}
       <WarmHalo closestWarmM={warmM} />
 
-      {/* One-shot indoor prompt — fires the first time the player
-          crosses into any building trigger zone (and we have indoor
-          stops authored). Once confirmed, indoorRevealed flips true
+      {/* Indoor prompt — fires the first time the player crosses into
+          any building trigger zone (and we have indoor stops authored).
+          Sticky once shown: stays until they tap the button, even if
+          they wander out of the trigger. Tapping flips indoorRevealed
           and the prompt is gone for the rest of the session. */}
       <IndoorPromptOverlay
-        open={hasIndoorStops && playerInTrigger && !progress.indoorRevealed}
+        open={hasIndoorStops && indoorPromptShown && !progress.indoorRevealed}
         onConfirm={() => progress.setIndoorRevealed(true)}
       />
 
