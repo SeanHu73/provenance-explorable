@@ -48,6 +48,7 @@ import StopPinMarker, { PinVariant } from './StopPinMarker';
 import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
 import IndoorPromptOverlay from './IndoorPromptOverlay';
+import ExplainerPromptOverlay from './ExplainerPromptOverlay';
 import SortScreen from './SortScreen';
 import RevealSequence from './RevealSequence';
 import dynamic from 'next/dynamic';
@@ -70,6 +71,10 @@ export default function ExplorableMap() {
   const [journalOpen, setJournalOpen] = useState(false);
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [autoExplainerFired, setAutoExplainerFired] = useState(false);
+  // Set true when the player crosses the 4-stop threshold. The actual
+  // prompt only renders once StopCard / other modals are closed, so
+  // the lesson never interrupts the Collected screen.
+  const [explainerPending, setExplainerPending] = useState(false);
   const [midwaySortOpen, setMidwaySortOpen] = useState(false);
   const [finalSortOpen, setFinalSortOpen] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
@@ -151,14 +156,16 @@ export default function ExplorableMap() {
     // the latch only flips one direction, so missing it is harmless.
   }, [playerInTrigger, progress.indoorRevealed, indoorPromptShown]);
 
-  // Auto-fire the contextualisation explainer once the player has
-  // collected enough stops. One-shot per session — closing it doesn't
-  // re-trigger.
+  // Queue the contextualisation explainer once the player has collected
+  // enough stops. We don't open it directly here — the StopCard is
+  // probably still on screen showing the Collected celebration. Instead
+  // we flip a pending flag; the ExplainerPromptOverlay below renders
+  // only once activeStopId clears.
   useEffect(() => {
     if (autoExplainerFired) return;
     if (progress.collectedIds.size >= AUTO_EXPLAINER_THRESHOLD) {
       setAutoExplainerFired(true);
-      setExplainerOpen(true);
+      setExplainerPending(true);
     }
   }, [progress.collectedIds.size, autoExplainerFired]);
 
@@ -307,12 +314,33 @@ export default function ExplorableMap() {
       {devMode && (
         <button
           type="button"
-          onClick={() => setExplainerOpen(true)}
+          onClick={() => {
+            setExplainerPending(false);
+            setExplainerOpen(true);
+          }}
           className="absolute bottom-5 right-4 z-30 px-3 py-2 rounded-lg bg-stone-900/75 hover:bg-stone-900/90 text-white text-xs font-medium backdrop-blur-sm shadow"
         >
           Dev · Lesson preview
         </button>
       )}
+
+      {/* "Learn about contextualising" interstitial — appears only
+          when the lesson is queued AND no other modal is on screen. */}
+      <ExplainerPromptOverlay
+        open={
+          explainerPending &&
+          !activeStop &&
+          !journalOpen &&
+          !explainerOpen &&
+          !midwaySortOpen &&
+          !finalSortOpen &&
+          !revealOpen
+        }
+        onBegin={() => {
+          setExplainerPending(false);
+          setExplainerOpen(true);
+        }}
+      />
 
       {/* Contextualisation explainer modal — auto-fires at
           AUTO_EXPLAINER_THRESHOLD collected stops (one-shot), or

@@ -178,13 +178,8 @@ function QuestionScreenView({
       {screen.questionHtml && (
         <SnapShell>
           <div
-            className="rich text-left sm:text-center"
-            style={{
-              fontFamily: 'var(--font-dm-serif-display), Georgia, serif',
-              color: 'var(--th-primary, #8b2538)',
-              fontSize: 'clamp(1.75rem, 5vw, 2.5rem)',
-              lineHeight: 1.15,
-            }}
+            className="rich text-xl sm:text-2xl leading-relaxed"
+            style={{ color: 'var(--th-text, #3a3a32)' }}
             dangerouslySetInnerHTML={{ __html: screen.questionHtml }}
           />
           <ScrollHint />
