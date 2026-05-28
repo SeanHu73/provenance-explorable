@@ -17,6 +17,8 @@ interface Props {
   collectedIds: Set<string>;
   onClose: () => void;
   onOpenStop: (stopId: string) => void;
+  /** Shows a "Finish tour" button when there's anything to finalise. */
+  onFinishTour?: () => void;
 }
 
 export default function JournalSheet({
@@ -25,6 +27,7 @@ export default function JournalSheet({
   collectedIds,
   onClose,
   onOpenStop,
+  onFinishTour,
 }: Props) {
   const collected = stops.filter((s) => collectedIds.has(s.id));
 
@@ -72,6 +75,23 @@ export default function JournalSheet({
                 ×
               </button>
             </header>
+
+            {onFinishTour && collected.length > 0 && (
+              <div className="px-5 pt-3">
+                <button
+                  type="button"
+                  onClick={onFinishTour}
+                  className="w-full px-4 py-3 rounded-xl text-white text-sm font-semibold shadow"
+                  style={{ background: 'var(--th-primary, #8b2538)' }}
+                >
+                  Finish the tour
+                </button>
+                <p className="text-[11px] text-stone-500 text-center mt-1.5">
+                  Reviews your evidence and shows where you and the author
+                  disagree.
+                </p>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {collected.length === 0 ? (

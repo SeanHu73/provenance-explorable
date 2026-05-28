@@ -111,30 +111,87 @@ export function isInAnyTrigger(
 // request so every page load is a fresh session. Reintroduce
 // persistence here if multi-session play comes back.
 
+export type Verdict = 'context' | 'trash';
+
+export interface RevealResponse {
+  agreed: boolean;
+  reason?: string;
+}
+
 export interface ProgressState {
   collectedIds: Set<string>;
   indoorRevealed: boolean;
+  /** Per-stop sort verdict — does the player count it as evidence? */
+  verdicts: Map<string, Verdict>;
+  /** Stops that have been through ANY sort screen — used to decide
+   *  which ones show up in the final sort. */
+  sortedStopIds: Set<string>;
+  /** Player's agree/disagree response (and optional reason) to the
+   *  author's assessment, captured during the reveal sequence. */
+  revealResponses: Map<string, RevealResponse>;
+
   collect: (stopId: string) => void;
   uncollect: (stopId: string) => void;
   setIndoorRevealed: (v: boolean) => void;
+  /** Record a batch of verdicts (from a sort screen) and mark those
+   *  stop ids as sorted. */
+  recordSort: (entries: Array<{ stopId: string; verdict: Verdict }>) => void;
+  /** Record a reveal-phase response for a specific stop. */
+  recordRevealResponse: (stopId: string, response: RevealResponse) => void;
   resetAll: () => void;
 }
 
 export function useProgress(): ProgressState {
   const [collected, setCollected] = useState<string[]>([]);
   const [indoor, setIndoor] = useState<boolean>(false);
+  const [verdictPairs, setVerdictPairs] = useState<Array<[string, Verdict]>>([]);
+  const [sorted, setSorted] = useState<string[]>([]);
+  const [responsePairs, setResponsePairs] = useState<Array<[string, RevealResponse]>>([]);
 
   const collectedSet = useMemo(() => new Set(collected), [collected]);
+  const verdictsMap = useMemo(() => new Map(verdictPairs), [verdictPairs]);
+  const sortedSet = useMemo(() => new Set(sorted), [sorted]);
+  const responsesMap = useMemo(() => new Map(responsePairs), [responsePairs]);
 
   return {
     collectedIds: collectedSet,
     indoorRevealed: indoor,
-    collect: (id) => setCollected((arr) => (arr.includes(id) ? arr : [...arr, id])),
+    verdicts: verdictsMap,
+    sortedStopIds: sortedSet,
+    revealResponses: responsesMap,
+
+    collect: (id) =>
+      setCollected((arr) => (arr.includes(id) ? arr : [...arr, id])),
     uncollect: (id) => setCollected((arr) => arr.filter((x) => x !== id)),
     setIndoorRevealed: (v) => setIndoor(v),
+
+    recordSort: (entries) => {
+      setVerdictPairs((prev) => {
+        const next = new Map(prev);
+        for (const { stopId, verdict } of entries) next.set(stopId, verdict);
+        return Array.from(next.entries());
+      });
+      setSorted((arr) => {
+        const set = new Set(arr);
+        for (const { stopId } of entries) set.add(stopId);
+        return Array.from(set);
+      });
+    },
+
+    recordRevealResponse: (stopId, response) => {
+      setResponsePairs((prev) => {
+        const next = new Map(prev);
+        next.set(stopId, response);
+        return Array.from(next.entries());
+      });
+    },
+
     resetAll: () => {
       setCollected([]);
       setIndoor(false);
+      setVerdictPairs([]);
+      setSorted([]);
+      setResponsePairs([]);
     },
   };
 }

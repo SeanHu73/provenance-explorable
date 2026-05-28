@@ -48,6 +48,8 @@ import StopPinMarker, { PinVariant } from './StopPinMarker';
 import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
 import IndoorPromptOverlay from './IndoorPromptOverlay';
+import SortScreen from './SortScreen';
+import RevealSequence from './RevealSequence';
 import dynamic from 'next/dynamic';
 
 const ContextualisationExplainer = dynamic(
@@ -68,6 +70,10 @@ export default function ExplorableMap() {
   const [journalOpen, setJournalOpen] = useState(false);
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [autoExplainerFired, setAutoExplainerFired] = useState(false);
+  const [midwaySortOpen, setMidwaySortOpen] = useState(false);
+  const [finalSortOpen, setFinalSortOpen] = useState(false);
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [eq, setEq] = useState<string>('');
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [triggers, setTriggers] = useState<BuildingTrigger[]>([]);
   const [bounds, setBounds] = useState<MapBounds>(STANFORD_BOUNDS);
@@ -92,9 +98,39 @@ export default function ExplorableMap() {
     getConfig().then((c) => {
       setBgPhoto(c.backgroundPhotoUrl);
       setTriggers(c.buildingTriggers || []);
+      setEq(c.essentialQuestion || 'What is this place for?');
       if (c.bounds) setBounds(c.bounds);
     });
   }, []);
+
+  // After the auto-fired explainer closes, open the midway sort with
+  // everything collected so far. Manual (dev) opens of the explainer
+  // don't trigger this.
+  const handleExplainerClose = useCallback(() => {
+    setExplainerOpen(false);
+    if (autoExplainerFired && progress.sortedStopIds.size === 0) {
+      setMidwaySortOpen(true);
+    }
+  }, [autoExplainerFired, progress.sortedStopIds.size]);
+
+  // Stops we'll show in each sort screen — collected ∩ (sorted or not).
+  const midwayStops = useMemo(
+    () => stops.filter((s) => progress.collectedIds.has(s.id)),
+    [stops, progress.collectedIds],
+  );
+  const finalSortStops = useMemo(
+    () =>
+      stops.filter(
+        (s) =>
+          progress.collectedIds.has(s.id) &&
+          !progress.sortedStopIds.has(s.id),
+      ),
+    [stops, progress.collectedIds, progress.sortedStopIds],
+  );
+  const allSortedStops = useMemo(
+    () => stops.filter((s) => progress.sortedStopIds.has(s.id)),
+    [stops, progress.sortedStopIds],
+  );
 
   const playerInTrigger = useMemo(
     () => isInAnyTrigger(loc.position, triggers),
@@ -283,7 +319,7 @@ export default function ExplorableMap() {
           opened manually by the dev menu above. */}
       {explainerOpen && (
         <ContextualisationExplainer
-          onClose={() => setExplainerOpen(false)}
+          onClose={handleExplainerClose}
         />
       )}
 
@@ -293,7 +329,58 @@ export default function ExplorableMap() {
         collectedIds={progress.collectedIds}
         onClose={() => setJournalOpen(false)}
         onOpenStop={(id) => setActiveStopId(id)}
+        onFinishTour={() => {
+          setJournalOpen(false);
+          setFinalSortOpen(true);
+        }}
       />
+
+      {/* ── Midway sort — opens after the auto-fired explainer closes */}
+      {midwaySortOpen && (
+        <SortScreen
+          title="Midway — sort your evidence"
+          essentialQuestion={eq}
+          stops={midwayStops}
+          backgroundPhotoUrl={bgPhoto}
+          onComplete={(entries) => {
+            progress.recordSort(entries);
+            setMidwaySortOpen(false);
+          }}
+        />
+      )}
+
+      {/* ── Final sort — opens when the player taps "Finish tour" */}
+      {finalSortOpen && (
+        <SortScreen
+          title={
+            finalSortStops.length > 0
+              ? 'Final — sort the rest'
+              : 'Final review'
+          }
+          essentialQuestion={eq}
+          stops={finalSortStops}
+          backgroundPhotoUrl={bgPhoto}
+          onComplete={(entries) => {
+            progress.recordSort(entries);
+            setFinalSortOpen(false);
+            setRevealOpen(true);
+          }}
+          onCancel={() => setFinalSortOpen(false)}
+        />
+      )}
+
+      {/* ── Reveal sequence — runs after the final sort */}
+      {revealOpen && (
+        <RevealSequence
+          stops={allSortedStops}
+          verdicts={progress.verdicts}
+          backgroundPhotoUrl={bgPhoto}
+          onRecordResponse={(stopId, response) =>
+            progress.recordRevealResponse(stopId, response)
+          }
+          onComplete={() => setRevealOpen(false)}
+        />
+      )}
 
       {/* Active stop modal */}
       {activeStop && (
