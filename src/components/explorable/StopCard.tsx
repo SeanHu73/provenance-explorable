@@ -89,19 +89,20 @@ export default function StopCard({ stop, backgroundPhotoUrl, onComplete, onClose
         <Section>
           <Tag>Notice</Tag>
           <Heading>{stop.title || 'Look around…'}</Heading>
-          {stop.notice.prompt && <Body>{stop.notice.prompt}</Body>}
-
-          {stop.notice.photos.length > 0 && (
-            <PhotoStrip
-              photos={stop.notice.photos.map((p) => ({ url: p.url, caption: p.caption }))}
-            />
-          )}
 
           {stop.notice.audio && (
             <audio
               src={stop.notice.audio.url}
               controls
-              className="w-full mt-2"
+              className="w-full"
+            />
+          )}
+
+          {stop.notice.prompt && <Body>{stop.notice.prompt}</Body>}
+
+          {stop.notice.photos.length > 0 && (
+            <PhotoStrip
+              photos={stop.notice.photos.map((p) => ({ url: p.url, caption: p.caption }))}
             />
           )}
 
@@ -117,6 +118,15 @@ export default function StopCard({ stop, backgroundPhotoUrl, onComplete, onClose
         {/* ─── Context ────────────────────────────────────────── */}
         <Section>
           <Tag>Context</Tag>
+
+          {stop.context.audio && (
+            <audio
+              src={stop.context.audio.url}
+              controls
+              className="w-full"
+            />
+          )}
+
           {stop.context.text ? (
             <Body className="text-lg sm:text-xl text-left whitespace-pre-line">
               {stop.context.text}
@@ -130,14 +140,6 @@ export default function StopCard({ stop, backgroundPhotoUrl, onComplete, onClose
           {stop.context.photos.length > 0 && (
             <PhotoStrip
               photos={stop.context.photos.map((p) => ({ url: p.url, caption: p.caption }))}
-            />
-          )}
-
-          {stop.context.audio && (
-            <audio
-              src={stop.context.audio.url}
-              controls
-              className="w-full mt-2"
             />
           )}
 

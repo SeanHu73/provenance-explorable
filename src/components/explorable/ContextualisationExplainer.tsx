@@ -173,71 +173,95 @@ function QuestionScreenView({
     : null;
 
   return (
-    <SnapShell wide>
-      <div className="space-y-8">
-        {screen.questionHtml ? (
+    <>
+      {/* 1. The initial question on its own screen (only if authored). */}
+      {screen.questionHtml && (
+        <SnapShell>
           <div
-            className="rich"
+            className="rich text-left sm:text-center"
             style={{
               fontFamily: 'var(--font-dm-serif-display), Georgia, serif',
               color: 'var(--th-primary, #8b2538)',
-              fontSize: '2rem',
+              fontSize: 'clamp(1.75rem, 5vw, 2.5rem)',
               lineHeight: 1.15,
             }}
             dangerouslySetInnerHTML={{ __html: screen.questionHtml }}
           />
-        ) : (
-          <Heading>Question</Heading>
-        )}
+          <ScrollHint />
+        </SnapShell>
+      )}
 
-        <div className="flex flex-col gap-3 max-w-md mx-auto">
-          {screen.options.map((opt) => {
-            const isSelected = selected === opt.id;
-            const isCorrect = isSelected && opt.correct;
-            const isWrong = isSelected && !opt.correct;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleClick(opt.id)}
-                className={`px-5 py-4 rounded-lg text-lg sm:text-xl text-left transition-colors border-2 font-medium ${
-                  isCorrect
-                    ? 'bg-green-600 border-green-700 text-white'
-                    : isWrong
-                    ? 'bg-red-600 border-red-700 text-white'
-                    : 'bg-white/70 border-stone-300 text-stone-800 hover:bg-white hover:border-stone-500'
+      {/* 2. One presentation screen per option (skip empty ones). */}
+      {screen.options.map((opt) =>
+        opt.presentationHtml || opt.tag ? (
+          <SnapShell key={`pres-${opt.id}`}>
+            {opt.tag && <Tag>{opt.tag}</Tag>}
+            {opt.presentationHtml && (
+              <div
+                className="rich text-xl sm:text-2xl leading-relaxed"
+                style={{ color: 'var(--th-text, #3a3a32)' }}
+                dangerouslySetInnerHTML={{ __html: opt.presentationHtml }}
+              />
+            )}
+            <ScrollHint />
+          </SnapShell>
+        ) : null,
+      )}
+
+      {/* 3. Final choice screen — buttons + responses. */}
+      <SnapShell wide>
+        <div className="space-y-8">
+          <Heading>Pick the right one</Heading>
+
+          <div className="flex flex-col gap-3 max-w-md mx-auto">
+            {screen.options.map((opt) => {
+              const isSelected = selected === opt.id;
+              const isCorrect = isSelected && opt.correct;
+              const isWrong = isSelected && !opt.correct;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => handleClick(opt.id)}
+                  className={`px-5 py-4 rounded-lg text-lg sm:text-xl text-left transition-colors border-2 font-medium ${
+                    isCorrect
+                      ? 'bg-green-600 border-green-700 text-white'
+                      : isWrong
+                      ? 'bg-red-600 border-red-700 text-white'
+                      : 'bg-white/70 border-stone-300 text-stone-800 hover:bg-white hover:border-stone-500'
+                  }`}
+                  style={{
+                    fontFamily: 'var(--font-newsreader), Georgia, serif',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <AnimatePresence mode="wait">
+            {selectedOpt && (
+              <motion.div
+                key={selectedOpt.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className={`rich text-base sm:text-lg leading-relaxed mt-4 ${
+                  selectedOpt.correct ? 'text-green-800' : 'text-red-800'
                 }`}
-                style={{
-                  fontFamily: 'var(--font-newsreader), Georgia, serif',
+                dangerouslySetInnerHTML={{
+                  __html:
+                    selectedOpt.responseHtml ||
+                    (selectedOpt.correct ? 'Correct!' : 'Not quite — try again.'),
                 }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+              />
+            )}
+          </AnimatePresence>
         </div>
-
-        <AnimatePresence mode="wait">
-          {selectedOpt && (
-            <motion.div
-              key={selectedOpt.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25 }}
-              className={`rich text-base sm:text-lg leading-relaxed mt-4 ${
-                selectedOpt.correct ? 'text-green-800' : 'text-red-800'
-              }`}
-              dangerouslySetInnerHTML={{
-                __html:
-                  selectedOpt.responseHtml ||
-                  (selectedOpt.correct ? 'Correct!' : 'Not quite — try again.'),
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    </SnapShell>
+      </SnapShell>
+    </>
   );
 }
 

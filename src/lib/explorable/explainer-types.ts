@@ -34,9 +34,18 @@ export interface TextScreen extends BaseScreen {
 
 export interface QuestionOption {
   id: string;
-  label: string;          // short button text — plain text only
+  /** Small uppercase tag shown above the option's presentation
+   *  screen — e.g. "Clue A". Optional. */
+  tag: string;
+  /** Long-form rich text shown on its OWN screen, before the player
+   *  reaches the multiple-choice buttons. */
+  presentationHtml: string;
+  /** Short button text on the choice screen — plain text only. */
+  label: string;
   correct: boolean;
-  responseHtml: string;   // rich text shown when this option is tapped
+  /** Rich text shown after the player taps this option on the
+   *  choice screen (red box if wrong, green if correct). */
+  responseHtml: string;
 }
 
 export interface QuestionScreen extends BaseScreen {
@@ -75,12 +84,16 @@ export function blankQuestionScreen(): QuestionScreen {
     options: [
       {
         id: id(),
+        tag: 'Clue A',
+        presentationHtml: '',
         label: 'Option A',
         correct: false,
         responseHtml: '',
       },
       {
         id: id(),
+        tag: 'Clue B',
+        presentationHtml: '',
         label: 'Option B',
         correct: true,
         responseHtml: '',
@@ -92,6 +105,8 @@ export function blankQuestionScreen(): QuestionScreen {
 export function blankQuestionOption(): QuestionOption {
   return {
     id: id(),
+    tag: '',
+    presentationHtml: '',
     label: 'New option',
     correct: false,
     responseHtml: '',

@@ -19,6 +19,9 @@ export const ACCEPT_AUDIO = 'audio/*';
 const RESIZE_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const RESIZE_MAX_DIM = 2000;
 const RESIZE_JPEG_QUALITY = 0.85;
+// Re-encoding to JPEG only works for static formats — GIFs would lose
+// their animation. Skip resize for anything outside this list.
+const RESIZABLE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 interface UploadResponse {
   url?: string;
@@ -28,10 +31,11 @@ interface UploadResponse {
 }
 
 export async function uploadFile(file: File, kind: UploadKind): Promise<string> {
-  const processed =
-    kind === 'photo' && file.size > RESIZE_THRESHOLD_BYTES
-      ? await resizeImageFile(file)
-      : file;
+  const shouldResize =
+    kind === 'photo' &&
+    file.size > RESIZE_THRESHOLD_BYTES &&
+    RESIZABLE_TYPES.has(file.type);
+  const processed = shouldResize ? await resizeImageFile(file) : file;
 
   const formData = new FormData();
   formData.append('file', processed);

@@ -308,7 +308,7 @@ function QuestionScreenEditor({
 
   return (
     <>
-      <Field label="Question">
+      <Field label="Question (initial screen text)">
         <RichTextEditor
           value={screen.questionHtml}
           onChange={(questionHtml) => onPatch({ questionHtml })}
@@ -320,44 +320,88 @@ function QuestionScreenEditor({
       <div className="space-y-3">
         <div className="text-xs font-medium text-stone-700">
           Options ({screen.options.length})
+          <span className="block text-[11px] font-normal text-stone-500 mt-0.5">
+            Each option gets its own presentation screen first, then they all
+            appear together on the multiple-choice screen as buttons.
+          </span>
         </div>
+
         {screen.options.map((opt, i) => (
           <div
             key={opt.id}
-            className={`p-3 rounded border space-y-2 ${
+            className={`p-3 rounded border space-y-3 ${
               opt.correct
                 ? 'border-green-300 bg-green-50'
                 : 'border-stone-200 bg-stone-50'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1 text-xs text-stone-700">
-                <input
-                  type="radio"
-                  name={`correct-${screen.id}`}
-                  checked={opt.correct}
-                  onChange={() => setCorrect(i)}
-                />
-                Correct
-              </label>
-              <input
-                type="text"
-                value={opt.label}
-                onChange={(e) => patchOption(i, { label: e.target.value })}
-                placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                className="flex-1 px-2 py-1.5 border border-stone-300 rounded text-sm"
+            {/* Per-option presentation screen */}
+            <div className="space-y-2 pb-3 border-b border-stone-200">
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+                Presentation screen — shown on its own before the choice
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <label className="block">
+                  <span className="block text-[10px] uppercase tracking-wider text-stone-500 mb-1">
+                    Tag (optional)
+                  </span>
+                  <input
+                    type="text"
+                    value={opt.tag}
+                    onChange={(e) => patchOption(i, { tag: e.target.value })}
+                    placeholder={`Clue ${String.fromCharCode(65 + i)}`}
+                    className="w-full px-2 py-1.5 border border-stone-300 rounded text-sm"
+                  />
+                </label>
+                <div />
+              </div>
+              <RichTextEditor
+                value={opt.presentationHtml}
+                onChange={(presentationHtml) =>
+                  patchOption(i, { presentationHtml })
+                }
+                placeholder="e.g. Your friend Jason was eating a cake last Thursday. It must have been him."
+                minHeight={80}
               />
-              <button
-                type="button"
-                onClick={() => removeOption(i)}
-                className="text-xs px-2 py-1 rounded border border-red-300 bg-red-50 text-red-700"
-              >
-                ×
-              </button>
             </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-1">
-                Response shown when tapped
+
+            {/* Choice-screen button + correctness */}
+            <div className="space-y-2 pb-3 border-b border-stone-200">
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+                On the choice screen
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1 text-xs text-stone-700 whitespace-nowrap">
+                  <input
+                    type="radio"
+                    name={`correct-${screen.id}`}
+                    checked={opt.correct}
+                    onChange={() => setCorrect(i)}
+                  />
+                  Correct
+                </label>
+                <input
+                  type="text"
+                  value={opt.label}
+                  onChange={(e) => patchOption(i, { label: e.target.value })}
+                  placeholder={`Button label (e.g. "Jason")`}
+                  className="flex-1 px-2 py-1.5 border border-stone-300 rounded text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeOption(i)}
+                  className="text-xs px-2 py-1 rounded border border-red-300 bg-red-50 text-red-700"
+                  aria-label="Remove option"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Response shown after tapping */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
+                Response when this button is tapped
               </div>
               <RichTextEditor
                 value={opt.responseHtml}
