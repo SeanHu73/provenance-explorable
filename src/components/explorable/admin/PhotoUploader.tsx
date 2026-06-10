@@ -65,8 +65,15 @@ export default function PhotoUploader({ photos, onChange, label = 'Photos' }: Pr
         {label}
       </div>
 
-      {photos.length === 0 && (
+      {photos.length === 0 ? (
         <p className="text-xs text-stone-500 italic">No photos yet.</p>
+      ) : (
+        <p className="text-xs text-stone-500">
+          Tip: type{' '}
+          <code className="bg-stone-200 px-1 rounded">[photo:1]</code> in the
+          text to place a photo exactly there (the number is the photo&apos;s
+          position below). Unreferenced photos appear after the text.
+        </p>
       )}
 
       <ul className="space-y-2">
@@ -75,11 +82,19 @@ export default function PhotoUploader({ photos, onChange, label = 'Photos' }: Pr
             key={idx}
             className="flex items-start gap-2 p-2 bg-white border border-stone-200 rounded"
           >
-            <img
-              src={p.url}
-              alt={p.caption || ''}
-              className="w-20 h-20 object-cover rounded border border-stone-200 flex-shrink-0"
-            />
+            <div className="relative flex-shrink-0">
+              <img
+                src={p.url}
+                alt={p.caption || ''}
+                className="w-20 h-20 object-cover rounded border border-stone-200"
+              />
+              <span
+                className="absolute top-0.5 left-0.5 min-w-[1.25rem] h-5 px-1 inline-flex items-center justify-center rounded bg-stone-900/80 text-white text-[11px] font-bold"
+                title={`Reference as [photo:${idx + 1}]`}
+              >
+                {idx + 1}
+              </span>
+            </div>
             <div className="flex-1 min-w-0 space-y-1">
               <input
                 type="text"

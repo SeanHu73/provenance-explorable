@@ -94,13 +94,10 @@ export default function StopCard({
             />
           )}
 
-          {stop.notice.prompt && <Body>{stop.notice.prompt}</Body>}
-
-          {stop.notice.photos.length > 0 && (
-            <PhotoStrip
-              photos={stop.notice.photos.map((p) => ({ url: p.url, caption: p.caption }))}
-            />
-          )}
+          <BodyWithInlinePhotos
+            text={stop.notice.prompt}
+            photos={stop.notice.photos}
+          />
 
           {hasNoticeTimer && (
             <div className="text-xs uppercase tracking-[0.25em] text-stone-500 mt-4">
@@ -123,20 +120,16 @@ export default function StopCard({
             />
           )}
 
-          {stop.context.text ? (
-            <Body className="text-lg sm:text-xl text-left whitespace-pre-line">
-              {stop.context.text}
-            </Body>
+          {stop.context.text || stop.context.photos.length > 0 ? (
+            <BodyWithInlinePhotos
+              text={stop.context.text}
+              photos={stop.context.photos}
+              bodyClassName="text-lg sm:text-xl text-left whitespace-pre-line"
+            />
           ) : (
             <Body className="italic text-stone-500">
               (No context text authored yet.)
             </Body>
-          )}
-
-          {stop.context.photos.length > 0 && (
-            <PhotoStrip
-              photos={stop.context.photos.map((p) => ({ url: p.url, caption: p.caption }))}
-            />
           )}
 
           <ScrollHint label="One more ↓" />
@@ -284,6 +277,83 @@ function Body({
     >
       {children}
     </p>
+  );
+}
+
+/**
+ * Renders body text with photos placed inline wherever the author wrote
+ * a `[photo:N]` token (N is 1-based, matching the photo's position in
+ * the editor). Any photos the author didn't reference inline fall to a
+ * strip at the end, so the old "text then all photos" behaviour is the
+ * default when no tokens are used.
+ */
+function BodyWithInlinePhotos({
+  text,
+  photos,
+  bodyClassName = '',
+}: {
+  text: string;
+  photos: { url: string; caption?: string }[];
+  bodyClassName?: string;
+}) {
+  const tokenRe = /\[photo:(\d+)\]/g;
+  const used = new Set<number>();
+  const blocks: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = tokenRe.exec(text)) !== null) {
+    const before = text.slice(lastIndex, m.index);
+    if (before.trim()) {
+      blocks.push(
+        <Body key={key++} className={bodyClassName}>
+          {before}
+        </Body>,
+      );
+    }
+    const photoIdx = parseInt(m[1], 10) - 1;
+    const photo = photos[photoIdx];
+    if (photo && !used.has(photoIdx)) {
+      used.add(photoIdx);
+      blocks.push(<InlinePhoto key={key++} photo={photo} />);
+    }
+    lastIndex = tokenRe.lastIndex;
+  }
+
+  const after = text.slice(lastIndex);
+  if (after.trim()) {
+    blocks.push(
+      <Body key={key++} className={bodyClassName}>
+        {after}
+      </Body>,
+    );
+  }
+
+  const leftover = photos.filter((_, i) => !used.has(i));
+
+  return (
+    <>
+      {blocks}
+      {leftover.length > 0 && (
+        <PhotoStrip
+          photos={leftover.map((p) => ({ url: p.url, caption: p.caption }))}
+        />
+      )}
+    </>
+  );
+}
+
+function InlinePhoto({ photo }: { photo: { url: string; caption?: string } }) {
+  return (
+    <figure className="space-y-1 mt-2">
+      <img src={photo.url} alt={photo.caption || ''} className="w-full rounded-lg shadow" />
+      {photo.caption && (
+        <figcaption className="text-xs italic text-stone-600">
+          {photo.caption}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 
