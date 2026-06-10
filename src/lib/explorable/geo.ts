@@ -48,3 +48,21 @@ export function distanceM(a: LatLng, b: LatLng): number {
     Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
+
+/**
+ * Initial-bearing in degrees from `a` to `b`, measured clockwise from
+ * true north (0 = north, 90 = east, 180 = south, 270 = west).
+ *
+ * The campus map is rendered north-up with no heading rotation, so this
+ * bearing maps directly to a screen direction: 0 points up, 90 right.
+ */
+export function bearingDeg(a: LatLng, b: LatLng): number {
+  const φ1 = a.lat * (Math.PI / 180);
+  const φ2 = b.lat * (Math.PI / 180);
+  const Δλ = (b.lng - a.lng) * (Math.PI / 180);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * (180 / Math.PI) + 360) % 360;
+}

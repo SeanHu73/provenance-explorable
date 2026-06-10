@@ -15,7 +15,7 @@
  *    collected). Completion marks the stop in localStorage.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   APIProvider,
   Map as GoogleMap,
@@ -26,6 +26,7 @@ import {
 import {
   STANFORD_BOUNDS,
   STANFORD_CENTER,
+  bearingDeg,
 } from '@/lib/explorable/geo';
 import { useLocationSource } from '@/lib/explorable/location-source';
 import { useStops } from '@/lib/explorable/use-stops';
@@ -51,6 +52,8 @@ import StopCard from './StopCard';
 import JournalSheet from './JournalSheet';
 import IndoorPromptOverlay from './IndoorPromptOverlay';
 import ExplainerPromptOverlay from './ExplainerPromptOverlay';
+import ClueArrows, { ClueArrowTarget } from './ClueArrows';
+import StartFindingOverlay from './StartFindingOverlay';
 import SortScreen from './SortScreen';
 import RevealSequence from './RevealSequence';
 import dynamic from 'next/dynamic';
@@ -97,6 +100,9 @@ export default function ExplorableMap() {
   // open the explainer without collecting 4 stops first.
   const [devMode, setDevMode] = useState(false);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
+  // One-time "Tap to Start Finding" explainer shown when the player
+  // first reaches the map.
+  const [startHintDismissed, setStartHintDismissed] = useState(false);
 
   useEffect(() => {
     const envFlag = process.env.NEXT_PUBLIC_ENABLE_DEV_LOC === 'true';
@@ -106,6 +112,18 @@ export default function ExplorableMap() {
       new URLSearchParams(window.location.search).has('devloc');
     setDevMode(envFlag || isDev || urlFlag);
   }, []);
+
+  // In dev mode, turn fake GPS on automatically (and drop the player at
+  // the campus centre if no dev position is set yet) so the experience
+  // is testable from a desk without granting real geolocation. Runs once
+  // per mount; the dev can still toggle it back off in the dev panel.
+  const devAutoApplied = useRef(false);
+  useEffect(() => {
+    if (!devMode || devAutoApplied.current) return;
+    devAutoApplied.current = true;
+    if (!loc.devEnabled) loc.setDevEnabled(true);
+    if (!loc.devPosition) loc.setDevPosition(STANFORD_CENTER);
+  }, [devMode, loc]);
 
   useEffect(() => {
     getConfig().then((c) => {
@@ -216,6 +234,25 @@ export default function ExplorableMap() {
     [discoveries],
   );
 
+  // Directional arrows: point toward the nearest outdoor clues the
+  // player hasn't reached yet (out of the discovery radius, so no pin
+  // is showing). Capped at the closest few so the player marker stays
+  // readable. Indoor stops are excluded — those surface via the
+  // "I'm inside" prompt, not by walking up to a map point.
+  const clueArrows = useMemo<ClueArrowTarget[]>(() => {
+    if (!loc.position) return [];
+    const player = loc.position;
+    return discoveries
+      .filter((d) => d.status === 'warm' || d.status === 'far')
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 3)
+      .map((d) => ({
+        id: d.stop.id,
+        bearing: bearingDeg(player, d.stop.location),
+        distanceM: d.distanceM,
+      }));
+  }, [discoveries, loc.position]);
+
   const hasIndoorStops = useMemo(
     () => stops.some((s) => s.isIndoor),
     [stops],
@@ -275,6 +312,7 @@ export default function ExplorableMap() {
               anchorPoint={AdvancedMarkerAnchorPoint.CENTER}
             >
               <PlayerDot source={loc.position.source} />
+              <ClueArrows targets={clueArrows} />
             </AdvancedMarker>
           )}
 
@@ -303,6 +341,22 @@ export default function ExplorableMap() {
       <IndoorPromptOverlay
         open={hasIndoorStops && indoorPromptShown && !progress.indoorRevealed}
         onConfirm={() => progress.setIndoorRevealed(true)}
+      />
+
+      {/* One-time "Tap to Start Finding" explainer. Only over a clean
+          map — never lands on top of a StopCard, sort, or other modal. */}
+      <StartFindingOverlay
+        open={
+          !startHintDismissed &&
+          !activeStop &&
+          !journalOpen &&
+          !explainerOpen &&
+          !midwaySortOpen &&
+          !finalSortOpen &&
+          !revealOpen
+        }
+        devMode={devMode}
+        onDismiss={() => setStartHintDismissed(true)}
       />
 
       {/* Dev panel */}
