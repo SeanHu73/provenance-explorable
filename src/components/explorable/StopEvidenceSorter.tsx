@@ -18,8 +18,11 @@ import { useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  CollisionDetection,
   PointerSensor,
   TouchSensor,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
@@ -43,6 +46,16 @@ interface Props {
 }
 
 type Zone = EvidenceCategory | 'pool';
+
+// Drop where the finger/pointer is, not where the card's box overlaps.
+// rectIntersection (the default) makes edge buckets hard to hit because
+// the dragged card can't extend past the screen edge; pointerWithin
+// registers wherever the pointer is over a bucket. Fall back to
+// rectIntersection if the pointer isn't over any droppable.
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
+  return pointerHits.length > 0 ? pointerHits : rectIntersection(args);
+};
 
 interface Item {
   id: string;
@@ -161,7 +174,11 @@ export default function StopEvidenceSorter({
       )}
       <div className="absolute inset-0 z-0 bg-stone-900/35" />
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        onDragEnd={handleDragEnd}
+      >
         <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
           {/* ── Header ─────────────────────────────────────── */}
           <header
@@ -310,23 +327,28 @@ function Bucket({
   return (
     <div
       ref={setNodeRef}
-      className="rounded-xl p-2 transition-colors"
+      className="rounded-xl p-2 transition-all duration-150"
       style={{
-        background: isOver ? 'rgba(255,255,255,0.97)' : 'rgba(255,255,255,0.82)',
-        border: `2px dashed ${accent}`,
-        minHeight: 96,
+        background: isOver ? `${accent}26` : 'rgba(255,255,255,0.82)',
+        border: isOver ? `3px solid ${accent}` : `2px dashed ${accent}`,
+        boxShadow: isOver
+          ? `0 0 0 4px ${accent}55, 0 10px 24px rgba(0,0,0,0.28)`
+          : 'none',
+        transform: isOver ? 'scale(1.04)' : 'scale(1)',
+        minHeight: 120,
       }}
     >
       <div
-        className="text-[10px] sm:text-[11px] uppercase tracking-[0.12em] mb-1.5 font-semibold leading-tight"
+        className="text-[10px] sm:text-[11px] uppercase tracking-[0.12em] mb-1.5 font-semibold leading-tight flex items-center gap-1"
         style={{ color: accent }}
       >
         {label}{' '}
         <span className="text-stone-500 font-normal">({items.length})</span>
+        {isOver && <span aria-hidden>← drop here</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         {items.map((it) => (
-          <DraggableCard key={it.id} item={it} accent={accent} />
+          <DraggableCard key={it.id} item={it} accent={accent} condensed />
         ))}
       </div>
     </div>
@@ -359,10 +381,13 @@ function DraggableCard({
   item,
   accent,
   shake = false,
+  condensed = false,
 }: {
   item: Item;
   accent?: string;
   shake?: boolean;
+  /** Collapse the text once the card is sitting in a bucket so it fits. */
+  condensed?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: item.id });
@@ -385,14 +410,18 @@ function DraggableCard({
       style={style}
       {...listeners}
       {...attributes}
-      className="select-none rounded-lg bg-white shadow px-3 py-2 text-sm text-stone-800 leading-snug"
+      className={`select-none rounded-lg bg-white shadow text-stone-800 leading-snug ${
+        condensed ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'
+      }`}
     >
       {item.source === 'learner' && (
         <span className="text-[9px] uppercase tracking-wider text-stone-400 block mb-0.5">
           You added
         </span>
       )}
-      {item.text}
+      <span className={condensed ? 'line-clamp-2 break-words' : ''}>
+        {item.text}
+      </span>
       <style>{`
         @keyframes evidence-shake {
           0%, 100% { transform: translateX(0); }
