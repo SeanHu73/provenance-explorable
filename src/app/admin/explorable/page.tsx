@@ -61,6 +61,12 @@ export default function ExplorableAdminPage() {
             >
               Open game (dev override)
             </Link>
+            <Link
+              href="/explorables/contextualization"
+              className="text-blue-700 hover:underline font-semibold"
+            >
+              Contextualization explorable →
+            </Link>
             <Link href="/admin" className="text-blue-700 hover:underline">
               Legacy Provenance admin
             </Link>
