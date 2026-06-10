@@ -18,7 +18,7 @@
 
 import { useMemo, useState } from 'react';
 import { LatLng, PlayerPosition, distanceM } from './geo';
-import { ExplorableStop } from './stop-types';
+import { ExplorableStop, EvidenceCategory } from './stop-types';
 import { BuildingTrigger } from './config-store';
 
 export const DISCOVERY_RADIUS_M = 15;
@@ -125,87 +125,70 @@ export function isInAnyTrigger(
 // request so every page load is a fresh session. Reintroduce
 // persistence here if multi-session play comes back.
 
-export type Verdict = 'context' | 'trash';
-
-export interface RevealResponse {
-  agreed: boolean;
-  reason?: string;
+/**
+ * A single piece of evidence the player has placed into a bucket at a
+ * stop. `source` distinguishes author-provided samples (which had a
+ * correct bucket) from things the player heard and added themselves.
+ */
+export interface CategorisedEvidence {
+  id: string;
+  stopId: string;
+  text: string;
+  category: EvidenceCategory;
+  source: 'sample' | 'learner';
 }
 
 export interface ProgressState {
   collectedIds: Set<string>;
   indoorRevealed: boolean;
-  /** Per-stop sort verdict — does the player count it as evidence? */
-  verdicts: Map<string, Verdict>;
-  /** Stops that have been through ANY sort screen — used to decide
-   *  which ones show up in the final sort. */
-  sortedStopIds: Set<string>;
-  /** Player's agree/disagree response (and optional reason) to the
-   *  author's assessment, captured during the reveal sequence. */
-  revealResponses: Map<string, RevealResponse>;
+  /** Every piece of evidence the player has bucketed, across all stops.
+   *  Drives the final reflection screen. */
+  categorisedEvidence: CategorisedEvidence[];
+  /** The player's free-response answer to the essential question. */
+  eqAnswer: string;
 
   collect: (stopId: string) => void;
   uncollect: (stopId: string) => void;
   setIndoorRevealed: (v: boolean) => void;
-  /** Record a batch of verdicts (from a sort screen) and mark those
-   *  stop ids as sorted. */
-  recordSort: (entries: Array<{ stopId: string; verdict: Verdict }>) => void;
-  /** Record a reveal-phase response for a specific stop. */
-  recordRevealResponse: (stopId: string, response: RevealResponse) => void;
+  /** Replace all categorised evidence for a stop (idempotent on re-sort). */
+  recordStopEvidence: (stopId: string, items: CategorisedEvidence[]) => void;
+  setEqAnswer: (text: string) => void;
   resetAll: () => void;
 }
 
 export function useProgress(): ProgressState {
   const [collected, setCollected] = useState<string[]>([]);
   const [indoor, setIndoor] = useState<boolean>(false);
-  const [verdictPairs, setVerdictPairs] = useState<Array<[string, Verdict]>>([]);
-  const [sorted, setSorted] = useState<string[]>([]);
-  const [responsePairs, setResponsePairs] = useState<Array<[string, RevealResponse]>>([]);
+  const [categorised, setCategorised] = useState<CategorisedEvidence[]>([]);
+  const [eqAnswer, setEqAnswerState] = useState<string>('');
 
   const collectedSet = useMemo(() => new Set(collected), [collected]);
-  const verdictsMap = useMemo(() => new Map(verdictPairs), [verdictPairs]);
-  const sortedSet = useMemo(() => new Set(sorted), [sorted]);
-  const responsesMap = useMemo(() => new Map(responsePairs), [responsePairs]);
 
   return {
     collectedIds: collectedSet,
     indoorRevealed: indoor,
-    verdicts: verdictsMap,
-    sortedStopIds: sortedSet,
-    revealResponses: responsesMap,
+    categorisedEvidence: categorised,
+    eqAnswer,
 
     collect: (id) =>
       setCollected((arr) => (arr.includes(id) ? arr : [...arr, id])),
     uncollect: (id) => setCollected((arr) => arr.filter((x) => x !== id)),
     setIndoorRevealed: (v) => setIndoor(v),
 
-    recordSort: (entries) => {
-      setVerdictPairs((prev) => {
-        const next = new Map(prev);
-        for (const { stopId, verdict } of entries) next.set(stopId, verdict);
-        return Array.from(next.entries());
-      });
-      setSorted((arr) => {
-        const set = new Set(arr);
-        for (const { stopId } of entries) set.add(stopId);
-        return Array.from(set);
-      });
+    recordStopEvidence: (stopId, items) => {
+      setCategorised((prev) => [
+        ...prev.filter((e) => e.stopId !== stopId),
+        ...items,
+      ]);
     },
 
-    recordRevealResponse: (stopId, response) => {
-      setResponsePairs((prev) => {
-        const next = new Map(prev);
-        next.set(stopId, response);
-        return Array.from(next.entries());
-      });
-    },
+    setEqAnswer: (text) => setEqAnswerState(text),
 
     resetAll: () => {
       setCollected([]);
       setIndoor(false);
-      setVerdictPairs([]);
-      setSorted([]);
-      setResponsePairs([]);
+      setCategorised([]);
+      setEqAnswerState('');
     },
   };
 }

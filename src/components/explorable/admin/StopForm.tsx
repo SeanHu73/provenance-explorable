@@ -19,6 +19,7 @@ import { useAutoSave, autoSaveLabel, autoSaveColor } from '@/lib/explorable/use-
 import PhotoUploader from './PhotoUploader';
 import AudioUploader from './AudioUploader';
 import IndoorMapEditor from './IndoorMapEditor';
+import ContextualEvidenceEditor from './ContextualEvidenceEditor';
 
 const PinPlacementMap = dynamic(() => import('./PinPlacementMap'), { ssr: false });
 
@@ -41,8 +42,6 @@ export default function StopForm({ initial, isNew }: Props) {
     setStop((s) => ({ ...s, context: { ...s.context, ...p } }));
   const patchPuzzle = (p: Partial<ExplorableStop['puzzlePiece']>) =>
     setStop((s) => ({ ...s, puzzlePiece: { ...s.puzzlePiece, ...p } }));
-  const patchAssessment = (p: Partial<ExplorableStop['authorAssessment']>) =>
-    setStop((s) => ({ ...s, authorAssessment: { ...s.authorAssessment, ...p } }));
 
   const save = useCallback((s: ExplorableStop) => saveStop(s), []);
 
@@ -257,40 +256,18 @@ export default function StopForm({ initial, isNew }: Props) {
         </div>
       </Section>
 
-      {/* ── Author assessment ────────────────────────────────────── */}
-      <Section title="Author's evidence assessment">
+      {/* ── Contextual evidence ──────────────────────────────────── */}
+      <Section title="Contextual Evidence (players sort these)">
         <p className="text-xs text-stone-600">
-          Revealed only after the player has submitted their own sort.
+          Sample evidence the player drags into <strong>Perspective</strong>,{' '}
+          <strong>Time</strong>, or <strong>Place</strong> at this stop. Pick
+          the correct bucket for each — a wrong drop bounces back so they try
+          again. Players can also add evidence they heard themselves.
         </p>
-        <Field label="Is this relevant evidence for the essential question?">
-          <div className="flex gap-3">
-            <label className="flex items-center gap-2 px-3 py-1.5 border border-stone-300 rounded text-sm">
-              <input
-                type="radio"
-                checked={stop.authorAssessment.included === true}
-                onChange={() => patchAssessment({ included: true })}
-              />
-              Yes — include
-            </label>
-            <label className="flex items-center gap-2 px-3 py-1.5 border border-stone-300 rounded text-sm">
-              <input
-                type="radio"
-                checked={stop.authorAssessment.included === false}
-                onChange={() => patchAssessment({ included: false })}
-              />
-              No — exclude
-            </label>
-          </div>
-        </Field>
-        <Field label="Why? (shown on the back of the piece at reveal time)">
-          <textarea
-            value={stop.authorAssessment.explanation}
-            onChange={(e) => patchAssessment({ explanation: e.target.value })}
-            rows={4}
-            className="w-full px-2 py-1.5 border border-stone-300 rounded text-sm"
-            placeholder="Your reasoning for including or excluding this stop as evidence."
-          />
-        </Field>
+        <ContextualEvidenceEditor
+          value={stop.contextualEvidence}
+          onChange={(contextualEvidence) => patch({ contextualEvidence })}
+        />
       </Section>
 
       {/* ── Actions ──────────────────────────────────────────────── */}

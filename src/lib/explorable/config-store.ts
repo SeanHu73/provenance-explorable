@@ -11,7 +11,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { LatLng, STANFORD_BOUNDS } from './geo';
-import { Screen } from './explainer-types';
 
 const COLLECTION = 'explorable-config';
 const DOC_ID = 'main';
@@ -36,7 +35,8 @@ export interface MapBounds {
 }
 
 export interface ExplorableConfig {
-  /** The essential question players see at start of game, midway sort, and final sort. */
+  /** The essential question players see at the start of the game and
+   *  answer in their own words on the final reflection screen. */
   essentialQuestion: string;
   /** Photo shown behind every player-facing screen (translucent cards
    *  sit on top). Mirrors Provenance's Tour.backgroundPhotoUrl. */
@@ -45,9 +45,6 @@ export interface ExplorableConfig {
   buildingTriggers: BuildingTrigger[];
   /** Hard pan boundary for the player map. Defaults to Stanford. */
   bounds: MapBounds;
-  /** Authored screens for the Contextualisation Explainer. Empty array
-   *  means use the built-in fallback. */
-  explainerScreens: Screen[];
   updatedAt: string;
 }
 
@@ -56,7 +53,6 @@ export const DEFAULT_CONFIG: ExplorableConfig = {
   backgroundPhotoUrl: null,
   buildingTriggers: [],
   bounds: { ...STANFORD_BOUNDS },
-  explainerScreens: [],
   updatedAt: new Date(0).toISOString(),
 };
 

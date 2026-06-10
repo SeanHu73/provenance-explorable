@@ -1,56 +1,52 @@
 'use client';
 
 /**
- * The player-facing stop sequence: Notice → Context → Collected.
+ * The player-facing stop sequence: Notice → Context → Sort the evidence
+ * → Collected.
  *
- * Visual treatment mirrors ContextualisationExplainer: fixed background
- * photo, translucent backdrop-blurred cards. The player snap-scrolls
- * through the three sections; on reaching "Collected" the stop is
- * marked complete in localStorage.
+ * Fixed background photo, translucent backdrop-blurred cards. The player
+ * snap-scrolls through Notice and Context, then sorts this stop's
+ * contextual evidence into Perspective / Time / Place. Finishing the
+ * sort marks the stop collected and records the bucketed evidence.
+ *
+ * Re-opening an already-collected stop skips straight to the collected
+ * celebration (no re-sorting).
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ExplorableStop, resolvePuzzlePiece } from '@/lib/explorable/stop-types';
+import { CategorisedEvidence } from '@/lib/explorable/discovery';
+import StopEvidenceSorter from './StopEvidenceSorter';
 
 interface Props {
   stop: ExplorableStop;
   /** Game-level background photo URL (null = neutral fallback). */
   backgroundPhotoUrl: string | null;
-  onComplete: () => void;
+  essentialQuestion: string;
+  /** True when re-opening a stop the player already finished. */
+  alreadyCollected: boolean;
+  onComplete: (items: CategorisedEvidence[]) => void;
   onClose: () => void;
 }
 
-export default function StopCard({ stop, backgroundPhotoUrl, onComplete, onClose }: Props) {
+export default function StopCard({
+  stop,
+  backgroundPhotoUrl,
+  essentialQuestion,
+  alreadyCollected,
+  onComplete,
+  onClose,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const completedRef = useRef(false);
-  const collectedSectionRef = useRef<HTMLDivElement>(null);
-  const [reachedCollected, setReachedCollected] = useState(false);
+  // Whether to show the collected celebration. Skipped to true when
+  // re-opening a stop that's already been finished.
+  const [done, setDone] = useState(alreadyCollected);
+  const [sorterOpen, setSorterOpen] = useState(false);
 
   useEffect(() => {
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }, []);
-
-  // Mark the stop collected the moment the "Collected!" section
-  // becomes mostly visible — runs once.
-  useEffect(() => {
-    const el = collectedSectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting && !completedRef.current) {
-            completedRef.current = true;
-            setReachedCollected(true);
-            onComplete();
-          }
-        }
-      },
-      { threshold: 0.6 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onComplete]);
 
   const piece = resolvePuzzlePiece(stop);
   const hasNoticeTimer = !!stop.notice.timerSeconds && stop.notice.timerSeconds > 0;
@@ -146,42 +142,76 @@ export default function StopCard({ stop, backgroundPhotoUrl, onComplete, onClose
           <ScrollHint label="One more ↓" />
         </Section>
 
-        {/* ─── Collected ──────────────────────────────────────── */}
-        <Section innerRef={collectedSectionRef}>
-          <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={reachedCollected ? { scale: 1, opacity: 1 } : { scale: 0.85, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-            className="flex flex-col items-center gap-4"
-          >
-            <div className="text-xs uppercase tracking-[0.3em] text-stone-500">
-              Collected
-            </div>
-            {piece.photoUrl ? (
-              <img
-                src={piece.photoUrl}
-                alt={piece.label}
-                className="w-40 h-40 object-cover rounded-xl shadow-xl"
-              />
-            ) : (
-              <div className="w-40 h-40 rounded-xl shadow-xl bg-stone-200 flex items-center justify-center text-stone-400">
-                no photo
-              </div>
-            )}
-            <Heading>{piece.label || 'New piece'}</Heading>
-            <Body className="text-base text-stone-700">
-              Added to your evidence inventory.
-            </Body>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-4 px-6 py-3 rounded-full bg-stone-900 text-white text-base hover:bg-stone-700"
+        {/* ─── Sort the evidence / Collected ──────────────────── */}
+        <Section>
+          {done ? (
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+              className="flex flex-col items-center gap-4"
             >
-              Back to the map
-            </button>
-          </motion.div>
+              <div className="text-xs uppercase tracking-[0.3em] text-stone-500">
+                Collected
+              </div>
+              {piece.photoUrl ? (
+                <img
+                  src={piece.photoUrl}
+                  alt={piece.label}
+                  className="w-40 h-40 object-cover rounded-xl shadow-xl"
+                />
+              ) : (
+                <div className="w-40 h-40 rounded-xl shadow-xl bg-stone-200 flex items-center justify-center text-stone-400">
+                  no photo
+                </div>
+              )}
+              <Heading>{piece.label || 'New piece'}</Heading>
+              <Body className="text-base text-stone-700">
+                Added to your evidence inventory.
+              </Body>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-4 px-6 py-3 rounded-full bg-stone-900 text-white text-base hover:bg-stone-700"
+              >
+                Back to the map
+              </button>
+            </motion.div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <Tag>Sort the evidence</Tag>
+              <Heading>Where does each clue belong?</Heading>
+              <Body className="text-base text-stone-700">
+                Sort what you found here into <strong>Perspective</strong>,{' '}
+                <strong>Time</strong>, or <strong>Place</strong> — and add
+                anything else you heard.
+              </Body>
+              <button
+                type="button"
+                onClick={() => setSorterOpen(true)}
+                className="mt-2 px-6 py-3 rounded-full text-white text-base font-semibold shadow"
+                style={{ background: 'var(--th-primary, #8b2538)' }}
+              >
+                Sort the evidence
+              </button>
+            </div>
+          )}
         </Section>
       </div>
+
+      {sorterOpen && (
+        <StopEvidenceSorter
+          stop={stop}
+          essentialQuestion={essentialQuestion}
+          backgroundPhotoUrl={backgroundPhotoUrl}
+          onCancel={() => setSorterOpen(false)}
+          onDone={(items) => {
+            onComplete(items);
+            setSorterOpen(false);
+            setDone(true);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -37,6 +37,7 @@ import {
   isInAnyTrigger,
   useProgress,
   StopDiscovery,
+  CategorisedEvidence,
 } from '@/lib/explorable/discovery';
 import {
   getConfig,
@@ -54,16 +55,7 @@ import IndoorPromptOverlay from './IndoorPromptOverlay';
 import ExplainerPromptOverlay from './ExplainerPromptOverlay';
 import ClueArrows, { ClueArrowTarget } from './ClueArrows';
 import StartFindingOverlay from './StartFindingOverlay';
-import SortScreen from './SortScreen';
-import RevealSequence from './RevealSequence';
-import dynamic from 'next/dynamic';
-
-const ContextualisationExplainer = dynamic(
-  () => import('./ContextualisationExplainer'),
-  { ssr: false },
-);
-
-const AUTO_EXPLAINER_THRESHOLD = 4;
+import FinalReflection from './FinalReflection';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const MAP_ID = 'b8f339c02d8c7d5bd3f12d1b';
@@ -74,18 +66,10 @@ export default function ExplorableMap() {
   const progress = useProgress();
   const [activeStopId, setActiveStopId] = useState<string | null>(null);
   const [journalOpen, setJournalOpen] = useState(false);
-  const [explainerOpen, setExplainerOpen] = useState(false);
-  const [autoExplainerFired, setAutoExplainerFired] = useState(false);
-  // Set true when the player crosses the 4-stop threshold. The actual
-  // prompt only renders once StopCard / other modals are closed, so
-  // the lesson never interrupts the Collected screen.
-  const [explainerPending, setExplainerPending] = useState(false);
-  const [midwaySortOpen, setMidwaySortOpen] = useState(false);
-  const [finalSortOpen, setFinalSortOpen] = useState(false);
-  const [revealOpen, setRevealOpen] = useState(false);
+  const [finalReflectionOpen, setFinalReflectionOpen] = useState(false);
   // Set true when the player has collected every authored stop; the
-  // "Review your evidence" interstitial then appears next time the
-  // map is clean.
+  // "Answer the essential question" interstitial then appears next time
+  // the map is clean.
   const [finalPending, setFinalPending] = useState(false);
   const [finalAutoFired, setFinalAutoFired] = useState(false);
   const [eq, setEq] = useState<string>('');
@@ -96,8 +80,8 @@ export default function ExplorableMap() {
   // indoor prompt stays open until they tap the button — even if they
   // wander out of the trigger again.
   const [indoorPromptShown, setIndoorPromptShown] = useState(false);
-  // Dev mode reveals an extra "Lesson preview" menu so authors can
-  // open the explainer without collecting 4 stops first.
+  // Dev mode reveals an extra menu so authors can jump to the final
+  // reflection without collecting every stop first.
   const [devMode, setDevMode] = useState(false);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
   // One-time "Tap to Start Finding" explainer shown when the player
@@ -134,35 +118,6 @@ export default function ExplorableMap() {
     });
   }, []);
 
-  // After the auto-fired explainer closes, open the midway sort with
-  // everything collected so far. Manual (dev) opens of the explainer
-  // don't trigger this.
-  const handleExplainerClose = useCallback(() => {
-    setExplainerOpen(false);
-    if (autoExplainerFired && progress.sortedStopIds.size === 0) {
-      setMidwaySortOpen(true);
-    }
-  }, [autoExplainerFired, progress.sortedStopIds.size]);
-
-  // Stops we'll show in each sort screen — collected ∩ (sorted or not).
-  const midwayStops = useMemo(
-    () => stops.filter((s) => progress.collectedIds.has(s.id)),
-    [stops, progress.collectedIds],
-  );
-  const finalSortStops = useMemo(
-    () =>
-      stops.filter(
-        (s) =>
-          progress.collectedIds.has(s.id) &&
-          !progress.sortedStopIds.has(s.id),
-      ),
-    [stops, progress.collectedIds, progress.sortedStopIds],
-  );
-  const allSortedStops = useMemo(
-    () => stops.filter((s) => progress.sortedStopIds.has(s.id)),
-    [stops, progress.sortedStopIds],
-  );
-
   const playerInTrigger = useMemo(
     () => isInAnyTrigger(loc.position, triggers),
     [loc.position, triggers],
@@ -182,22 +137,10 @@ export default function ExplorableMap() {
     // the latch only flips one direction, so missing it is harmless.
   }, [playerInTrigger, progress.indoorRevealed, indoorPromptShown]);
 
-  // Queue the contextualisation explainer once the player has collected
-  // enough stops. We don't open it directly here — the StopCard is
-  // probably still on screen showing the Collected celebration. Instead
-  // we flip a pending flag; the ExplainerPromptOverlay below renders
-  // only once activeStopId clears.
-  useEffect(() => {
-    if (autoExplainerFired) return;
-    if (progress.collectedIds.size >= AUTO_EXPLAINER_THRESHOLD) {
-      setAutoExplainerFired(true);
-      setExplainerPending(true);
-    }
-  }, [progress.collectedIds.size, autoExplainerFired]);
-
-  // Queue the final review once every authored stop has been collected.
-  // Same pattern as the lesson interstitial — wait for the map to be
-  // clean before showing the prompt.
+  // Queue the final reflection once every authored stop has been
+  // collected. We don't open it directly — the StopCard is probably
+  // still on screen. Instead we flip a pending flag; the prompt below
+  // renders only once the map is clean.
   useEffect(() => {
     if (finalAutoFired) return;
     if (stops.length === 0) return;
@@ -350,10 +293,7 @@ export default function ExplorableMap() {
           !startHintDismissed &&
           !activeStop &&
           !journalOpen &&
-          !explainerOpen &&
-          !midwaySortOpen &&
-          !finalSortOpen &&
-          !revealOpen
+          !finalReflectionOpen
         }
         devMode={devMode}
         onDismiss={() => setStartHintDismissed(true)}
@@ -388,7 +328,7 @@ export default function ExplorableMap() {
       </button>
 
       {/* Dev-only shortcuts. Small toggle button bottom-right; tap to
-          reveal the four shortcuts stacked above it. */}
+          reveal the shortcuts stacked above it. */}
       {devMode && (
         <div className="absolute bottom-5 right-4 z-30 flex flex-col gap-1.5 items-end">
           <AnimatePresence>
@@ -403,36 +343,12 @@ export default function ExplorableMap() {
               >
                 <DevShortcutBtn
                   onClick={() => {
-                    setExplainerPending(false);
-                    setExplainerOpen(true);
+                    setFinalPending(false);
+                    setFinalReflectionOpen(true);
                     setDevMenuOpen(false);
                   }}
                 >
-                  Lesson preview
-                </DevShortcutBtn>
-                <DevShortcutBtn
-                  onClick={() => {
-                    setMidwaySortOpen(true);
-                    setDevMenuOpen(false);
-                  }}
-                >
-                  Midway sort
-                </DevShortcutBtn>
-                <DevShortcutBtn
-                  onClick={() => {
-                    setFinalSortOpen(true);
-                    setDevMenuOpen(false);
-                  }}
-                >
-                  Final sort
-                </DevShortcutBtn>
-                <DevShortcutBtn
-                  onClick={() => {
-                    setRevealOpen(true);
-                    setDevMenuOpen(false);
-                  }}
-                >
-                  Reveal
+                  Final reflection
                 </DevShortcutBtn>
               </motion.div>
             )}
@@ -450,59 +366,24 @@ export default function ExplorableMap() {
         </div>
       )}
 
-      {/* "Learn about contextualising" interstitial — appears only
-          when the lesson is queued AND no other modal is on screen. */}
-      <ExplainerPromptOverlay
-        open={
-          explainerPending &&
-          !activeStop &&
-          !journalOpen &&
-          !explainerOpen &&
-          !midwaySortOpen &&
-          !finalSortOpen &&
-          !revealOpen
-        }
-        eyebrow="You've collected 4 pieces"
-        heading="Learn about contextualising"
-        buttonLabel="Begin lesson"
-        onBegin={() => {
-          setExplainerPending(false);
-          setExplainerOpen(true);
-        }}
-      />
-
-      {/* "Review your evidence" interstitial — fires once the player
-          has collected every authored stop. Same modal-guarding so
-          it never lands over an active StopCard or sort. The lesson
-          interstitial wins if both are pending at once. */}
+      {/* "Answer the essential question" interstitial — fires once the
+          player has collected every authored stop. Modal-guarded so it
+          never lands over an active StopCard or the reflection itself. */}
       <ExplainerPromptOverlay
         open={
           finalPending &&
-          !explainerPending &&
           !activeStop &&
           !journalOpen &&
-          !explainerOpen &&
-          !midwaySortOpen &&
-          !finalSortOpen &&
-          !revealOpen
+          !finalReflectionOpen
         }
         eyebrow="You've collected everything"
-        heading="Review your evidence"
-        buttonLabel="Begin review"
+        heading="Answer the essential question"
+        buttonLabel="Begin"
         onBegin={() => {
           setFinalPending(false);
-          setFinalSortOpen(true);
+          setFinalReflectionOpen(true);
         }}
       />
-
-      {/* Contextualisation explainer modal — auto-fires at
-          AUTO_EXPLAINER_THRESHOLD collected stops (one-shot), or
-          opened manually by the dev menu above. */}
-      {explainerOpen && (
-        <ContextualisationExplainer
-          onClose={handleExplainerClose}
-        />
-      )}
 
       <JournalSheet
         open={journalOpen}
@@ -513,67 +394,21 @@ export default function ExplorableMap() {
         onOpenStop={(id) => setActiveStopId(id)}
         onFinishTour={() => {
           setJournalOpen(false);
-          setFinalSortOpen(true);
+          setFinalReflectionOpen(true);
         }}
       />
 
-      {/* ── Midway sort — opens after the auto-fired explainer closes.
-          Falls back to ALL stops in dev so it's testable without
-          collecting four first. */}
-      {midwaySortOpen && (
-        <SortScreen
-          title="Midway — sort your evidence"
+      {/* ── Final reflection — bucketed evidence + EQ free response.
+          Fires when every stop is collected, from the journal's
+          "Finish the tour", or the dev shortcut. */}
+      {finalReflectionOpen && (
+        <FinalReflection
           essentialQuestion={eq}
-          stops={midwayStops.length > 0 ? midwayStops : stops}
+          categorisedEvidence={progress.categorisedEvidence}
+          answer={progress.eqAnswer}
+          onAnswerChange={progress.setEqAnswer}
           backgroundPhotoUrl={bgPhoto}
-          onComplete={(entries) => {
-            progress.recordSort(entries);
-            setMidwaySortOpen(false);
-          }}
-          onCancel={devMode ? () => setMidwaySortOpen(false) : undefined}
-        />
-      )}
-
-      {/* ── Final sort — opens when the player taps "Finish tour" */}
-      {finalSortOpen && (
-        <SortScreen
-          title={
-            finalSortStops.length > 0
-              ? 'Final — sort the rest'
-              : 'Final review'
-          }
-          essentialQuestion={eq}
-          stops={
-            finalSortStops.length > 0
-              ? finalSortStops
-              : stops.filter(
-                  (s) => !progress.sortedStopIds.has(s.id),
-                ).length > 0
-                ? stops.filter((s) => !progress.sortedStopIds.has(s.id))
-                : stops
-          }
-          backgroundPhotoUrl={bgPhoto}
-          onComplete={(entries) => {
-            progress.recordSort(entries);
-            setFinalSortOpen(false);
-            setRevealOpen(true);
-          }}
-          onCancel={() => setFinalSortOpen(false)}
-        />
-      )}
-
-      {/* ── Reveal sequence — runs after the final sort. Dev shortcut
-          uses all stops so authors can see the disagreement UI even
-          without sorting anything. */}
-      {revealOpen && (
-        <RevealSequence
-          stops={allSortedStops.length > 0 ? allSortedStops : stops}
-          verdicts={progress.verdicts}
-          backgroundPhotoUrl={bgPhoto}
-          onRecordResponse={(stopId, response) =>
-            progress.recordRevealResponse(stopId, response)
-          }
-          onComplete={() => setRevealOpen(false)}
+          onClose={() => setFinalReflectionOpen(false)}
         />
       )}
 
@@ -582,7 +417,12 @@ export default function ExplorableMap() {
         <StopCard
           stop={activeStop}
           backgroundPhotoUrl={bgPhoto}
-          onComplete={() => progress.collect(activeStop.id)}
+          essentialQuestion={eq}
+          alreadyCollected={progress.collectedIds.has(activeStop.id)}
+          onComplete={(items: CategorisedEvidence[]) => {
+            progress.collect(activeStop.id);
+            progress.recordStopEvidence(activeStop.id, items);
+          }}
           onClose={() => setActiveStopId(null)}
         />
       )}

@@ -91,9 +91,11 @@ export default function StopsListPage() {
                         <span>{s.context.photos.length} context photo{s.context.photos.length === 1 ? '' : 's'}</span>
                         {s.notice.audio && <span>notice audio</span>}
                         {s.context.audio && <span>context audio</span>}
-                        <span className={s.authorAssessment.included ? 'text-green-700' : 'text-red-700'}>
-                          {s.authorAssessment.included ? 'included' : 'excluded'}
-                        </span>
+                        {s.contextualEvidence.length > 0 && (
+                          <span>
+                            {s.contextualEvidence.length} evidence
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

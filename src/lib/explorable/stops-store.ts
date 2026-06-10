@@ -22,11 +22,24 @@ import { ExplorableStop } from './stop-types';
 
 const COLLECTION = 'explorable-stops';
 
+/**
+ * Backfill fields added after a stop was first saved, so older Firestore
+ * docs hydrate into a complete ExplorableStop.
+ */
+function normalizeStop(raw: ExplorableStop): ExplorableStop {
+  return {
+    ...raw,
+    contextualEvidence: raw.contextualEvidence ?? [],
+  };
+}
+
 export async function getStops(): Promise<ExplorableStop[]> {
   try {
     const snap = await getDocs(collection(db, COLLECTION));
     const stops: ExplorableStop[] = [];
-    snap.forEach((d) => stops.push({ id: d.id, ...d.data() } as ExplorableStop));
+    snap.forEach((d) =>
+      stops.push(normalizeStop({ id: d.id, ...d.data() } as ExplorableStop)),
+    );
     // Unstructured — show by creation order so the list is at least stable.
     return stops.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   } catch (err) {
@@ -39,7 +52,7 @@ export async function getStop(id: string): Promise<ExplorableStop | null> {
   try {
     const snap = await getDoc(doc(db, COLLECTION, id));
     if (!snap.exists()) return null;
-    return { id: snap.id, ...snap.data() } as ExplorableStop;
+    return normalizeStop({ id: snap.id, ...snap.data() } as ExplorableStop);
   } catch (err) {
     console.error('[explorable/stops-store] getStop failed:', err);
     return null;

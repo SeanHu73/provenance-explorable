@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { STANFORD_BOUNDS, STANFORD_CENTER } from '@/lib/explorable/geo';
 import {
   ExplorableConfig,
@@ -23,16 +22,8 @@ import {
 import SinglePhotoField from '@/components/explorable/admin/SinglePhotoField';
 import BuildingTriggersEditor from '@/components/explorable/admin/BuildingTriggersEditor';
 import BoundsEditor from '@/components/explorable/admin/BoundsEditor';
-import ScreensEditor from '@/components/explorable/admin/ScreensEditor';
-
-const ContextualisationExplainer = dynamic(
-  () => import('@/components/explorable/ContextualisationExplainer'),
-  { ssr: false },
-);
 
 export default function ExplorableAdminPage() {
-  const [showExplainer, setShowExplainer] = useState(false);
-
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 p-6 font-sans">
       <div className="max-w-4xl mx-auto">
@@ -107,13 +98,23 @@ export default function ExplorableAdminPage() {
           </div>
         </section>
 
-        <ExplainerScreensSection
-          onPreview={() => setShowExplainer(true)}
-        />
-
-        {showExplainer && (
-          <ContextualisationExplainer onClose={() => setShowExplainer(false)} />
-        )}
+        <section className="mb-6 p-4 bg-white border border-stone-300 rounded text-sm text-stone-700">
+          <h2 className="font-semibold text-lg mb-2">Evidence sorting</h2>
+          <p className="text-stone-600">
+            Players sort evidence into <strong>Perspective</strong>,{' '}
+            <strong>Time</strong>, and <strong>Place</strong> at each stop.
+            Author the sample evidence (and its correct bucket) inside each
+            stop, under{' '}
+            <Link
+              href="/admin/explorable/stops"
+              className="text-blue-700 underline"
+            >
+              Manage stops → Contextual Evidence
+            </Link>
+            . At the end of the tour players see everything they bucketed and
+            answer the essential question in their own words.
+          </p>
+        </section>
 
         <section className="p-4 bg-stone-100 border border-stone-300 rounded text-sm text-stone-700">
           <h2 className="font-semibold mb-2">How to test from your desk</h2>
@@ -182,9 +183,9 @@ function EssentialQuestionEditor() {
           {saveIndicator}
         </div>
         <p className="text-xs text-stone-600 mb-3">
-          Shown to players when they first enter the game and restated at
-          the midway and final sorts. Players don't answer it directly —
-          their evidence selections constitute their implicit answer.
+          Shown to players when they first enter the game. At the end of the
+          tour they answer it in their own words, with all their bucketed
+          evidence in front of them.
         </p>
 
         {loading ? (
@@ -316,76 +317,6 @@ function TriggersCollapsible({
         <p className="text-xs text-stone-500 italic">
           Collapsed. Click the heading to edit.
         </p>
-      )}
-    </section>
-  );
-}
-
-function ExplainerScreensSection({ onPreview }: { onPreview: () => void }) {
-  const [config, setConfig] = useState<ExplorableConfig>(DEFAULT_CONFIG);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const c = await getConfig();
-      if (!alive) return;
-      setConfig(c);
-      setLoading(false);
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  const save = useCallback((c: ExplorableConfig) => saveConfig(c), []);
-
-  const { status } = useAutoSave({
-    value: loading ? DEFAULT_CONFIG : config,
-    save,
-    delayMs: 1000,
-  });
-
-  const screenCount = config.explainerScreens.length;
-
-  return (
-    <section className="mb-6 p-4 bg-white border border-stone-300 rounded">
-      <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
-        <h2 className="font-semibold text-lg">Contextualisation Explainer</h2>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-medium ${autoSaveColor(status)}`}>
-            {autoSaveLabel(status) || (
-              <span className="text-stone-400">All changes saved</span>
-            )}
-          </span>
-          <button
-            type="button"
-            onClick={onPreview}
-            className="px-3 py-1.5 rounded bg-indigo-700 text-white text-sm hover:bg-indigo-800"
-          >
-            Preview
-          </button>
-        </div>
-      </div>
-      <p className="text-xs text-stone-600 mb-3">
-        Snap-scroll lesson shown between Exploration Phase 1 and the first
-        evidence sort. Add text screens for narration and question screens
-        for interactive moments. The Essential Question is appended
-        automatically as the final screen.
-      </p>
-      <p className="text-xs text-stone-500 mb-3">
-        {screenCount === 0
-          ? 'Empty — the built-in fallback (cake whodunnit + puzzle animation) will play.'
-          : `${screenCount} authored screen${screenCount === 1 ? '' : 's'} + EQ.`}
-      </p>
-
-      {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
-      ) : (
-        <ScreensEditor
-          value={config.explainerScreens}
-          onChange={(explainerScreens) =>
-            setConfig({ ...config, explainerScreens })
-          }
-        />
       )}
     </section>
   );

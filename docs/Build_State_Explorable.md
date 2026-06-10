@@ -1,16 +1,31 @@
 # Build State — Provenance Explorable
 
 *Handoff document for Claude Code sessions on the explorable project.
-Last updated 2026-05-28.
+Last updated 2026-06-10.
 Read this instead of re-discovering the codebase.*
 
-> **2026-05-28 — Intro screen + journal EQ banner.**
-> `/explorable` now opens on a cloudy intro that displays the essential
-> question; learners scroll (or tap the down arrow) to reveal the map
-> below. The shared `SplashScreen` overlay (Provenance pin-drop) is
-> suppressed on this route so the intro reads as the entry point. The
-> `JournalSheet` shows the EQ as a pinned banner at the top so learners
-> can re-anchor on it any time.
+> **2026-06-10 — Per-stop evidence sorting replaces the sort/reveal arc.**
+> The midway sort, final sort, contextualisation explainer, and reveal
+> sequence are **gone**. Instead, the contextualisation activity now
+> happens **at every stop**: after Notice + Context, the player drags
+> that stop's *contextual evidence* into one of three buckets —
+> **Perspective / Time / Place** — and can add evidence they heard
+> themselves. Author-provided samples carry a correct bucket; a wrong
+> drop bounces back. At the end of the tour, `FinalReflection` shows all
+> their bucketed evidence (collapsible per bucket) and asks them to
+> answer the essential question in a free-response box.
+>
+> Deleted: `SortScreen`, `RevealSequence`, `EvidenceCard`,
+> `ContextualisationExplainer`, admin `ScreensEditor`, `explainer-types`.
+> Added: `StopEvidenceSorter`, `FinalReflection`, admin
+> `ContextualEvidenceEditor`. `ExplorableStop.authorAssessment` and
+> `ExplorableConfig.explainerScreens` were removed.
+>
+> **2026-06-10 — Clue arrows, auto dev fake-GPS, start hint.** Arrows
+> radiate from the player marker toward the nearest uncollected outdoor
+> clues (`ClueArrows`, `bearingDeg` in geo.ts). Dev mode auto-enables
+> fake GPS at the campus centre. A one-time `StartFindingOverlay`
+> ("Tap to Start Finding") explains the loop on first reaching the map.
 
 ---
 
@@ -19,9 +34,9 @@ Read this instead of re-discovering the codebase.*
 A **single-player** GPS-based place-based learning experience built on
 the Provenance Next.js + Firebase scaffolding. Players walk a real
 physical site (currently Stanford), discover stops as they enter
-their detection radius, collect evidence, and ultimately sort that
-evidence against an author's assessment to learn **historical
-contextualisation**.
+their detection radius, and at each stop sort that stop's contextual
+evidence into **Perspective / Time / Place** — then answer the essential
+question at the end — to learn **historical contextualisation**.
 
 **Repo:** `github.com/SeanHu73/provenance-explorable`
 
@@ -55,11 +70,10 @@ State held:
 
 | Field | Purpose |
 |---|---|
-| `collectedIds` | stops the player has reached the "Collected" screen of |
+| `collectedIds` | stops the player has finished (reached "Collected") |
 | `indoorRevealed` | whether the indoor-prompt "Yes I'm inside" has been tapped |
-| `verdicts` | per-stop `'context' \| 'trash'` from midway + final sorts |
-| `sortedStopIds` | stops that have been through any sort screen |
-| `revealResponses` | per-stop `{ agreed, reason? }` from the reveal sequence |
+| `categorisedEvidence` | every bucketed `CategorisedEvidence` across all stops (`{ id, stopId, text, category, source }`) — drives the final reflection |
+| `eqAnswer` | the player's free-response answer to the essential question |
 
 ---
 
@@ -67,9 +81,9 @@ State held:
 
 | URL | Purpose |
 |---|---|
-| `/explorable` | The game. Two snap-aligned screens stacked vertically — `ExplorableIntro` (cloudy EQ opener) at the top, then `ExplorableMap` (bounded Stanford map, live GPS, player marker, journal, lesson, sorts, reveal) below. Learners scroll down to reach the map. |
+| `/explorable` | The game. Two snap-aligned screens stacked vertically — `ExplorableIntro` (cloudy EQ opener) at the top, then `ExplorableMap` (bounded Stanford map, live GPS, player marker, clue arrows, journal, per-stop evidence sort, final reflection) below. Learners scroll down to reach the map. |
 | `/explorable?devloc=1` | Same, but forces the dev location override panel and the bottom-right dev menu to appear regardless of environment. |
-| `/admin/explorable` | Game-level authoring: essential question, background photo, map bounds, indoor triggers, contextualisation explainer screens, lesson preview. |
+| `/admin/explorable` | Game-level authoring: essential question, background photo, map bounds, indoor triggers. (Per-stop contextual evidence is authored in the stop editor.) |
 | `/admin/explorable/stops` | Stop list. Add / open / delete stops. |
 | `/admin/explorable/stops/new` | New stop editor (redirects to `/[id]` on first auto-save). |
 | `/admin/explorable/stops/[id]` | Edit an authored stop. |
@@ -101,15 +115,14 @@ State held:
 - `notice: { prompt, timerSeconds, photos[], audio? }`
 - `context: { text, photos[], audio? }`
 - `puzzlePiece: { photoUrl?, label? }` — falls back to first notice photo / stop title
-- `authorAssessment: { included, explanation }` — author's verdict, shown in the reveal sequence
+- `contextualEvidence: ContextualEvidence[]` — author-provided sample evidence, each `{ id, text, category }` where category is the correct bucket (`'perspective' | 'time' | 'place'`). The player drags these into buckets; wrong drops bounce back.
 
 ### `ExplorableConfig`
 
-- `essentialQuestion: string`
-- `backgroundPhotoUrl: string | null` — frosted-glass card surface behind every lesson / stop / sort screen
+- `essentialQuestion: string` — shown at the intro; answered free-response on the final reflection screen
+- `backgroundPhotoUrl: string | null` — frosted-glass card surface behind every stop / sort / reflection screen
 - `bounds: { north, south, east, west }` — hard pan boundary for the player map (defaults to `STANFORD_BOUNDS`)
 - `buildingTriggers: BuildingTrigger[]` — hidden geofences that gate the "I'm inside" indoor prompt
-- `explainerScreens: Screen[]` — authored lesson content (text screens + multiple-choice question screens)
 
 ---
 
@@ -133,7 +146,18 @@ Tap pin → StopCard (full-screen translucent over background photo)
   ↓
 Snap-scroll: Notice (audio at top, prompt, photos, optional timer)
             → Context (audio at top, text, photos)
-            → Collected (puzzle piece animates in)
+            → "Sort the evidence" launch card
+  ↓
+Tap "Sort the evidence" → StopEvidenceSorter (full-screen, drag-and-drop)
+  ↓
+  EQ at top. Three buckets: Perspective | Time | Place.
+  Drag each sample piece into a bucket:
+    • correct → it stays in the bucket
+    • wrong   → bounces back to the pool + "Not quite — try again"
+  Optionally type evidence you heard yourself → "Add" → drag it into any bucket.
+  Continue (enabled once every sample is correctly placed)
+  ↓
+  Records the bucketed evidence, marks the stop collected → Collected celebration
   ↓
 "Back to the map" — pin is now BLUE (collected).
   ↓
@@ -142,51 +166,26 @@ Player crosses into a building's trigger zone (admin-authored geofence)
   Sticky prompt appears: "Are you inside Memorial Church?" (one-shot)
   Tap "Yes" → indoor pins reveal as RED pins anywhere, prompt gone forever this session
   ↓
-[Player keeps collecting]
-  ↓
-4th stop collected (AUTO_EXPLAINER_THRESHOLD)
-  ↓
-After they return to map → "Learn about contextualising" interstitial
-  ↓
-Tap "Begin lesson" → ContextualisationExplainer (snap-scroll over background photo)
-  ↓
-  Authored screens (text / question screens with per-option presentations + buttons)
-  → Essential Question screen at the end (always appended)
-  → Tap × to close
-  ↓
-MidwaySort auto-opens (because explainer was auto-fired and no sort yet done)
-  ↓
-  EQ pinned at top. Two drop zones: Context | Trash. Drag every collected
-  piece. Continue.
-  ↓
-[Back to map; player collects more]
+[Player keeps collecting + sorting]
   ↓
 All stops collected
   ↓
-After they return to map → "Review your evidence" interstitial
+After they return to map → "Answer the essential question" interstitial
   ↓
-Tap "Begin review" → FinalSort (only the stops not sorted at midway)
+Tap "Begin" → FinalReflection (full-screen over background photo)
   ↓
-  Sort. Continue → RevealSequence opens.
+  EQ pinned at top. All bucketed evidence shown grouped by
+  Perspective / Time / Place, each section collapsible (open by default).
+  Free-response textarea → answer the EQ (stored in progress.eqAnswer).
   ↓
-RevealSequence walks the disagreements one card at a time:
-  • RED halo    author would EXCLUDE, player put in Context
-  • YELLOW halo author would INCLUDE, player did not
-  ↓
-  Tap card → 3D flip → author's reasoning on the back
-  ↓
-  After flip: "I agree" / "I disagree" buttons appear
-    • Agree → records, advances to next card
-    • Disagree → textarea slides in (use phone keyboard mic to dictate) → Save & next
-  ↓
-End of reveal → "Done" → close
+"Done" → close
 ```
 
 ### Manual controls
 
-- **Journal** button (bottom-centre) — sheet listing every collected piece. The essential question is pinned at the top of the sheet (themed red banner) so learners can refer back to it. Tap a piece to re-open its StopCard. Below the EQ banner the sheet has **Finish the tour** button → opens FinalSort directly.
-- **Dev** button (bottom-right, small, dev-mode only) — expands to four shortcuts: Lesson preview, Midway sort, Final sort, Reveal. Falls back to all authored stops if collected is empty so the screens are demonstrable from a clean session.
-- **Dev location panel** (top-right, dev-mode only) — toggle Fake GPS, tap map to set position.
+- **Journal** button (bottom-centre) — sheet listing every collected piece. The essential question is pinned at the top of the sheet (themed red banner). Tap a piece to re-open its StopCard (re-opening a collected stop skips the sort and shows the Collected celebration). Below the EQ banner the sheet has a **Finish the tour** button → opens FinalReflection directly.
+- **Dev** button (bottom-right, small, dev-mode only) — expands to a **Final reflection** shortcut so authors can open the end screen without collecting everything first.
+- **Dev location panel** (top-right, dev-mode only) — toggle Fake GPS, tap map to set position. Dev mode auto-enables Fake GPS at the campus centre on load.
 
 ---
 
@@ -208,7 +207,7 @@ End of reveal → "Done" → close
 - Notice (prompt, timer in seconds, photos, audio)
 - Context (text, photos, audio)
 - Puzzle piece (photo URL override, label override, live preview)
-- Author's evidence assessment (include / exclude radio + explanation)
+- **Contextual Evidence** (`ContextualEvidenceEditor`) — add sample evidence rows, each with text + correct bucket (Perspective / Time / Place). Players drag these at the stop; wrong drops bounce back.
 - Delete
 
 All forms auto-save with a 1s debounce; status indicator at the top.
@@ -239,20 +238,21 @@ non-JPEG/PNG/WebP formats skip the resize so animation isn't lost.
 - **Discovery radii** are constants in `discovery.ts`: `DISCOVERY_RADIUS_M = 15`, `WARM_RADIUS_M = 30`. Forgiving of GPS drift.
 - **Service worker** (`public/sw.js`) only intercepts same-origin GETs to avoid breaking uploads. Cache name is `memorial-church-v2`. If you change the SW, bump the cache version.
 - **All progress in-memory.** Refresh = clean slate. Multi-session play would need to restore via sessionStorage or a Firestore room.
-- **Modal stacking:** explainer interstitials never render over an active StopCard, journal, lesson, or any sort/reveal modal — they wait for a clean map.
+- **Modal stacking:** the final-reflection interstitial never renders over an active StopCard, journal, or the reflection itself — it waits for a clean map.
 - **Indoor prompt is sticky** once any trigger has been crossed: stays open until the player taps "Yes I'm inside", which permanently disables all triggers + reveals indoor pins for the session.
-- **Midway sort fires only when the lesson was AUTO-fired** (`autoExplainerFired` latch), so dev "Lesson preview" doesn't drag the player into a sort.
-- **Pin colours:** discovered + indoor = red (pulsing); collected = blue (no pulse, no opacity reduction). Reveal halos: red = author excluded but player included, yellow = author included but player did not.
+- **Evidence sort is per-stop**, inside `StopCard` → `StopEvidenceSorter`. Drag-and-drop via `@dnd-kit`. Samples must land in their correct bucket (wrong drop bounces back); learner-added evidence accepts any bucket. Completing the sort calls `onComplete(items)`, which `collect()`s the stop and `recordStopEvidence()`s the bucketed items. Re-opening a collected stop skips the sort.
+- **Final reflection fires once every authored stop is collected** (`finalAutoFired` latch → `finalPending` → interstitial when the map is clean). Also reachable from the journal and the dev menu.
+- **Pin colours:** discovered + indoor = red (pulsing); collected = blue (no pulse, no opacity reduction).
+- **Clue arrows + start hint:** `ClueArrows` (in the player marker) point to the nearest uncollected outdoor stops; `StartFindingOverlay` is the one-time "Tap to Start Finding" intro.
 
 ---
 
 ## 7. What's not built (deferred)
 
 - **Two-player rooms** — single-player only right now. Firebase RTDB position sync is set up env-wise but no code uses it.
-- **Voice dictation button** — the disagreement textarea relies on the phone keyboard's built-in microphone instead of a dedicated SpeechRecognition button.
+- **EQ answer persistence / export** — `progress.eqAnswer` and `categorisedEvidence` live in memory only; nothing saves or submits the final reflection. Add a write to Firestore / Google Sheets if responses need collecting.
 - **Multi-session persistence** — refresh deliberately wipes progress. Add sessionStorage or move into Firestore rooms when needed.
 - **Auto-detect indoor on player approach** — currently manual via the geofence prompt. Replacing with continuous "are you inside this polygon?" detection would need building polygon authoring.
-- **Reveal "you all agreed" closing screen** — handled, but only shows a single card. Could be richer.
 - **Tour logging to Google Sheets** — the `/api/log-tour` endpoint exists from Provenance days but isn't called from explorable code.
 
 ---
@@ -268,6 +268,6 @@ non-JPEG/PNG/WebP formats skip the resize so animation isn't lost.
 ---
 
 *End of handoff. The build is playable end-to-end as a single-player
-experience. The major surfaces — game flow, admin authoring, sort
-mechanic, reveal sequence — are in place; deferred items above are
-the natural next moves.*
+experience. The major surfaces — game flow, admin authoring, per-stop
+evidence sorting, final reflection — are in place; deferred items above
+are the natural next moves.*

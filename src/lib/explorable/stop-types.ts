@@ -16,6 +16,38 @@
 
 import { LatLng } from './geo';
 
+/**
+ * The three buckets every piece of contextual evidence is sorted into.
+ * A historian contextualises a source along these axes: whose
+ * perspective it carries, when it comes from, and where it belongs.
+ */
+export type EvidenceCategory = 'perspective' | 'time' | 'place';
+
+export const EVIDENCE_CATEGORIES: {
+  key: EvidenceCategory;
+  label: string;
+  accent: string;
+}[] = [
+  { key: 'perspective', label: 'Perspective', accent: '#6d28d9' },
+  { key: 'time', label: 'Time', accent: '#b45309' },
+  { key: 'place', label: 'Place', accent: '#0f766e' },
+];
+
+export function evidenceCategoryLabel(key: EvidenceCategory): string {
+  return EVIDENCE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
+}
+
+/**
+ * An author-provided sample piece of evidence for a stop. The player
+ * drags it into a bucket; `category` is the correct answer, so a wrong
+ * drop bounces back and they try again.
+ */
+export interface ContextualEvidence {
+  id: string;
+  text: string;
+  category: EvidenceCategory;
+}
+
 export interface ExplorableStopPhoto {
   url: string;
   caption?: string;
@@ -86,12 +118,10 @@ export interface ExplorableStop {
     label: string | null;      // null = use stop title
   };
 
-  // Phase 4: Author's evidence assessment, revealed only after the
-  // player has submitted their own sort.
-  authorAssessment: {
-    included: boolean;         // does the author think this is relevant evidence?
-    explanation: string;       // why / why not
-  };
+  // Phase 4: Contextual evidence the player sorts into Perspective /
+  // Time / Place at this stop. Author-provided samples carry the correct
+  // bucket; the player can also add evidence they heard themselves.
+  contextualEvidence: ContextualEvidence[];
 
   createdAt: string;           // ISO 8601
   updatedAt: string;           // ISO 8601
@@ -102,6 +132,13 @@ export function newStopId(): string {
     return crypto.randomUUID();
   }
   return `stop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function newEvidenceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** Defaults for a brand-new stop. Stops are unstructured — no explicit order. */
@@ -129,10 +166,7 @@ export function blankStop(): ExplorableStop {
       photoUrl: null,
       label: null,
     },
-    authorAssessment: {
-      included: true,
-      explanation: '',
-    },
+    contextualEvidence: [],
     createdAt: now,
     updatedAt: now,
   };

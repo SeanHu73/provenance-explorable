@@ -109,8 +109,8 @@ export default function JournalSheet({
                   Finish the tour
                 </button>
                 <p className="text-[11px] text-stone-500 text-center mt-1.5">
-                  Reviews your evidence and shows where you and the author
-                  disagree.
+                  Review your bucketed evidence and answer the essential
+                  question.
                 </p>
               </div>
             )}
