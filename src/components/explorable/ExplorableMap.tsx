@@ -177,16 +177,23 @@ export default function ExplorableMap() {
     [discoveries],
   );
 
-  // Directional arrows: point toward the nearest outdoor clues the
-  // player hasn't reached yet (out of the discovery radius, so no pin
-  // is showing). Capped at the closest few so the player marker stays
-  // readable. Indoor stops are excluded — those surface via the
-  // "I'm inside" prompt, not by walking up to a map point.
+  // Directional arrows: point toward the nearest clues the player hasn't
+  // reached yet. Includes indoor stops that haven't been revealed yet
+  // (`indoorHidden`) — they have a real map location, so the arrow guides
+  // the player toward the building even before the "I'm inside" prompt
+  // surfaces them. Outdoor stops within the discovery radius (already
+  // showing a pin) and revealed/collected stops are excluded. Capped at
+  // the closest few so the player marker stays readable.
   const clueArrows = useMemo<ClueArrowTarget[]>(() => {
     if (!loc.position) return [];
     const player = loc.position;
     return discoveries
-      .filter((d) => d.status === 'warm' || d.status === 'far')
+      .filter(
+        (d) =>
+          d.status === 'warm' ||
+          d.status === 'far' ||
+          d.status === 'indoorHidden',
+      )
       .sort((a, b) => a.distanceM - b.distanceM)
       .slice(0, 3)
       .map((d) => ({
